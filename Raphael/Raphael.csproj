@@ -17,7 +17,7 @@
     <Description>Unified client UI for V Rising server mods — Bloodcraft, Beelzebub, Uriel, KindredCommands, and KindredLogistics — plus a standalone tabbed chat window. Surfaces their chat commands as buttons, forms, and on-screen overlays. (Formerly BloodCraftHub.)</Description>
     <Version>0.30.0</Version>
     <PackageId>$(Authors).$(AssemblyName)</PackageId>
-    <PackageProjectUrl>https://github.com/KDavidP1987/Raphael</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom</PackageProjectUrl>
 
     <!-- Optional: copy build output straight into your client's BepInEx plugins dir.
          Override on the command line: dotnet build -p:DeployToClient=true

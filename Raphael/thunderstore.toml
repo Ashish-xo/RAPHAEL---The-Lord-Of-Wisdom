@@ -13,5 +13,5 @@ namespace = "kdpen"
 name = "Raphael"
 versionNumber = "0.30.0"
 description = "Unified client UI for V Rising server mods — Bloodcraft, Beelzebub, Uriel, KindredCommands, KindredLogistics — plus a standalone chat window. Surfaces their chat commands as buttons, forms, and overlays. (Formerly BloodCraftHub.)"
-websiteUrl = "https://github.com/KDavidP1987/Raphael"
+websiteUrl = "https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom"
 containsNsfwContent = false

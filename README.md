@@ -28,14 +28,14 @@ Raphael **replaces** BloodCraftHub; it is **not** meant to run alongside it. Rap
 
 Raphael is **pre-1.0 and still in active testing.** It's daily-driven on a live server, but it's a client-side UI mod that hooks the game and runs alongside other mods — so **you may run into mod incompatibilities or other issues**, especially right after a version update or when combining it with other client-side mods.
 
-**If you hit anything — a crash, a conflict, weird UI/input behavior — please tell us.** The fastest way is the **[The Shadow Realm Discord](https://discord.gg/usC9QgBrXK)**; written-up [GitHub issues](https://github.com/KDavidP1987/Raphael/issues) also work. A crash log (from `BepInEx/LogOutput.log`) or a clear repro helps enormously and usually gets a fix into the next release quickly.
+**If you hit anything — a crash, a conflict, weird UI/input behavior — please tell us.** The fastest way is the **[The Shadow Realm Discord](https://discord.gg/usC9QgBrXK)**; written-up [GitHub issues](https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom/issues) also work. A crash log (from `BepInEx/LogOutput.log`) or a clear repro helps enormously and usually gets a fix into the next release quickly.
 
 ### Rolling back if a version update causes problems
 
 You can always drop back to an earlier version:
 
 - **In your mod manager (Thunderstore Mod Manager / r2modman):** select Raphael in your profile, open its **version dropdown**, pick the previous version, and let it download + swap automatically. Fully quit V Rising first.
-- **Manually:** download an older build from the [Thunderstore page](https://thunderstore.io/c/v-rising/p/kdpen/Raphael/) or [GitHub releases](https://github.com/KDavidP1987/Raphael/releases), then in your profile's `BepInEx/plugins` folder **delete the Raphael folder and replace it** with the older one (game closed).
+- **Manually:** download an older build from the [Thunderstore page](https://thunderstore.io/c/v-rising/p/kdpen/Raphael/) or [GitHub releases](https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom/releases), then in your profile's `BepInEx/plugins` folder **delete the Raphael folder and replace it** with the older one (game closed).
 - **If the client crashes on load after any version change:** close the game and delete the `BepInEx/interop` and `BepInEx/cache` folders in your profile — they rebuild automatically on the next launch and clear any stale/corrupted interop state.
 
 ---
@@ -66,7 +66,7 @@ If you want full Raphael functionality on a Quests-only / Professions-only serve
 
 ---
 
-**Repo:** https://github.com/KDavidP1987/Raphael
+**Repo:** https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom
 **Status:** v0.30.0 (rebranded from Raphael) — **pre-1.0 public beta**, actively developed (APIs and UI may still shift before 1.0).
 **Beelzebub integration target:** v0.131.0 (ApiVersion 28).
 **Uriel integration target:** ApiVersion 1 (object-spawn collection).
@@ -144,25 +144,25 @@ Full per-version history lives in [`CHANGELOG.md`](CHANGELOG.md).
 
 *All captures below are from v0.13.0 — every UI piece shown still applies in v0.17.3. Newer work (v0.16's input-suppression + Quick Actions overlay, and v0.17's Game UI group + tabbed chat window + Eclipse command-console mode) is largely invisible until triggered; the screenshots below still represent the day-to-day look of the panel.*
 
-![Class tab — class-synergy card (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG4.png)
+![Class tab — class-synergy card (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael-Lord-of-Wisdom/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG4.png)
 *Class tab — Active Class card now includes the live class-details block (Death Mage shown here, with archetype + tagline + weapon/blood synergies + on-hit debuff). The Last server response strip at the bottom shows the same data the Bloodcraft `.class lst` reply carries, with stat synergies color-coded by Weapon / Blood. Settings → Display → Combined overlay carries the same data into the combined HUD overlay's Weapon and Blood sections.*
 
-![Weapon Expertise tab — synergies + bonus-stat picker (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG7.png)
+![Weapon Expertise tab — synergies + bonus-stat picker (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael-Lord-of-Wisdom/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG7.png)
 *Weapon Expertise — Current Weapon Expertise card (level + chosen bonus-stat names + live numeric values), the v0.13 Class synergies card explaining which weapon stats your current class amplifies with a 1.5× cap, and the `Set bonus stat for a weapon` form. The collapsible reference below lists every baseline stat cap (Physical Power +20, Spell Power +10, etc.).*
 
-![Blood Legacy tab — class synergies (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG11.png)
+![Blood Legacy tab — class synergies (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael-Lord-of-Wisdom/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG11.png)
 *Blood Legacy — mirror treatment for the blood side. Current legacy state, class synergies card (which blood stats your class amplifies), action row, and the `.bl cst` set-bonus-stat form. Bottom collapsible has the full baseline-cap reference for every blood stat.*
 
-![Prestige tab — progression reference (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG9.png)
+![Prestige tab — progression reference (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael-Lord-of-Wisdom/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG9.png)
 *Prestige — current prestige rows for each system (XP / Blood Legacy / Weapon Expertise / Familiar), the Prestige info display with current-tier breakdown, plus the "What each prestige tier gives you" reference card so you can see what every additional tier of leveling / weapon / blood / Exo prestige actually grants.*
 
-![Settings — dual-zone color picker + scroll-position (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG6.png)
+![Settings — dual-zone color picker + scroll-position (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael-Lord-of-Wisdom/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG6.png)
 *Settings & Help → Settings — the v0.12 two-zone panel color theme (outer chrome + interior scroll surfaces, with seven dark + seven bright presets for the interior), per-overlay transparency sliders, panel-background color, and HUD extras toggles. v0.13.0's gold-band section markers make long Settings / Mod Help pages scannable.*
 
-![In-game capture — combined HUD elements (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG1.png)
+![In-game capture — combined HUD elements (v0.13.0)](https://raw.githubusercontent.com/KDavidP1987/Raphael-Lord-of-Wisdom/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG1.png)
 *Main panel open in-world to the V-Bloods collection tab, with the bound-familiar indicator at the right of the screen and the floating Raphael button strip at the top-right. The footer overlay-toggle row (visible at the bottom of the main panel) is where the v0.14 Combined toggle lives, sitting alongside XP / Familiar / Familiar Browser / Daily Quest / Professions / Shift Spell.*
 
-![In-castle capture — overlay readouts during play](https://raw.githubusercontent.com/KDavidP1987/Raphael/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG12.png)
+![In-castle capture — overlay readouts during play](https://raw.githubusercontent.com/KDavidP1987/Raphael-Lord-of-Wisdom/main/docs/screenshots/v0.13.0%20Screenshots/Raphael_Screenshot_v0.13.0-IMG12.png)
 *In-castle shot showing Raphael's overlays running unobtrusively alongside the V Rising HUD, with the player's familiar and servants in view. The right-side stack shows the XP / weapon / blood / familiar progress readouts streaming live data via Bloodcraft's signed broadcast protocol; the per-overlay transparency settings keep them legible without competing for visual attention.*
 
 ## What it does
@@ -321,7 +321,7 @@ traces back to their patience and careful repro work:
 Thank you all. The mod is meaningfully better because of you.
 
 Raphael is open source (MIT). Bug reports, feature ideas, and pull
-requests welcome at https://github.com/KDavidP1987/Raphael.
+requests welcome at https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom.
 
 ---
 
