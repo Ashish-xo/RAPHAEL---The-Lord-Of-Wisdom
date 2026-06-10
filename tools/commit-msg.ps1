@@ -13,7 +13,10 @@ param([string]$MessageFile)
 
 if (-not $MessageFile -or -not (Test-Path $MessageFile)) { exit 0 }
 
-$lines = Get-Content $MessageFile -ErrorAction SilentlyContinue
+# @(...) forces an array: a single-line file makes Get-Content return a bare string, and indexing a string
+# with [0] yields its first CHARACTER (e.g. "d" from "docs: ...") instead of the first line — which made every
+# single-`-m` (one-line) commit message spuriously fail validation. The array wrapper fixes that.
+$lines = @(Get-Content $MessageFile -ErrorAction SilentlyContinue)
 if (-not $lines) { exit 0 }
 
 $first = $lines[0]

@@ -2,7 +2,7 @@
 
 *Formerly **BloodCraftHub** — Raphael is its direct continuation and replacement.*
 
-Unified client-side V Rising UI mod that turns the chat commands of its companion server mods into buttons, forms, and on-screen overlays — first-class support for [Bloodcraft](https://thunderstore.io/c/v-rising/p/zfolmt/Bloodcraft/), [KindredCommands](https://thunderstore.io/c/v-rising/p/odjit/KindredCommands/), and [KindredLogistics](https://thunderstore.io/c/v-rising/p/odjit/KindredLogistics/), plus the sibling **Beelzebub** (ability capture / transforms) and **Uriel** (shared storage / public prisons / stair restyling / object spawning) mods. Each mod's tab group appears only when that mod is detected on your server, so it works whether your server runs one, several, or none.
+Unified client-side V Rising UI mod that turns the chat commands of its companion server mods into buttons, forms, and on-screen overlays — first-class support for [Bloodcraft](https://thunderstore.io/c/v-rising/p/zfolmt/Bloodcraft/), **Beelzebub** (ability capture / transforms), **Uriel** (shared storage / public prisons / stair restyling / object spawning), [KindredCommands](https://thunderstore.io/c/v-rising/p/odjit/KindredCommands/), and [KindredLogistics](https://thunderstore.io/c/v-rising/p/odjit/KindredLogistics/) — with more server-side mods to come. Each mod's tab group appears only when that mod is detected on your server, so it works whether your server runs one, several, or none.
 
 ---
 
