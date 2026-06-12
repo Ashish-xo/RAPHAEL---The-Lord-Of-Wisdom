@@ -147,7 +147,6 @@ public class Settings
     public static float BeelzSummonsOverlayTransparency => GetFloat(nameof(BeelzSummonsOverlayTransparency), UITransparency);
     public static float BeelzTransformOverlayTransparency => GetFloat(nameof(BeelzTransformOverlayTransparency), UITransparency);
     public static float UrielSharedOverlayTransparency => GetFloat(nameof(UrielSharedOverlayTransparency), UITransparency);
-    public static float [redacted]Transparency => GetFloat(nameof([redacted]Transparency), UITransparency);
     public static float UrielObjectSpawnerOverlayTransparency => GetFloat(nameof(UrielObjectSpawnerOverlayTransparency), UITransparency);
     public static float ChatWindowOverlayTransparency => GetFloat(nameof(ChatWindowOverlayTransparency), UITransparency);
     public static float DailyQuestTransparency       => GetFloat(nameof(DailyQuestTransparency),       UITransparency);
@@ -161,7 +160,6 @@ public class Settings
     public static void SetBeelzSummonsOverlayTransparency(float v) => SetFloat(nameof(BeelzSummonsOverlayTransparency), v);
     public static void SetBeelzTransformOverlayTransparency(float v) => SetFloat(nameof(BeelzTransformOverlayTransparency), v);
     public static void SetUrielSharedOverlayTransparency(float v) => SetFloat(nameof(UrielSharedOverlayTransparency), v);
-    public static void Set[redacted]Transparency(float v) => SetFloat(nameof([redacted]Transparency), v);
     public static void SetUrielObjectSpawnerOverlayTransparency(float v) => SetFloat(nameof(UrielObjectSpawnerOverlayTransparency), v);
     public static void SetChatWindowOverlayTransparency(float v) => SetFloat(nameof(ChatWindowOverlayTransparency), v);
     public static void SetDailyQuestTransparency(float v)       => SetFloat(nameof(DailyQuestTransparency), v);
@@ -707,10 +705,6 @@ public class Settings
     public static bool ShowBeelzTransformOverlay => (ConfigEntries[nameof(ShowBeelzTransformOverlay)] as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowUrielSharedOverlay => (ConfigEntries[nameof(ShowUrielSharedOverlay)] as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowUrielObjectSpawnerOverlay => (ConfigEntries[nameof(ShowUrielObjectSpawnerOverlay)] as ConfigEntry<bool>)?.Value ?? false;
-    public static bool Show[redacted] => (ConfigEntries[nameof(Show[redacted])] as ConfigEntry<bool>)?.Value ?? false;
-    // Faust [redacted]s: a floating label drawn over each [redacted]'s world position
-    // (projected to screen each frame). Persisted so it restores across logins like the other overlays.
-    public static bool [redacted] => (ConfigEntries[nameof([redacted])] as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowChatWindowOverlay => (ConfigEntries[nameof(ShowChatWindowOverlay)] as ConfigEntry<bool>)?.Value ?? false;
     public static bool ChatShowTimestamps => (ConfigEntries[nameof(ChatShowTimestamps)] as ConfigEntry<bool>)?.Value ?? true;
     public static bool ChatShowChannelTags => (ConfigEntries[nameof(ChatShowChannelTags)] as ConfigEntry<bool>)?.Value ?? true;
@@ -990,15 +984,6 @@ public class Settings
     public static void SetShowBeelzSummonsOverlay(bool v) => SetBool(nameof(ShowBeelzSummonsOverlay), v);
     public static void SetShowBeelzTransformOverlay(bool v) => SetBool(nameof(ShowBeelzTransformOverlay), v);
     public static void SetShowUrielSharedOverlay(bool v) => SetBool(nameof(ShowUrielSharedOverlay), v);
-    public static void SetShow[redacted](bool v) => SetBool(nameof(Show[redacted]), v);
-    public static void Set[redacted](bool v) => SetBool(nameof([redacted]), v);
-    // Bitmask of ObjCategory flags the [redacted] / [redacted] will show (default 0x3FF = resources +
-    // containers + prisons, Castle off). Edited via the per-category toggles in Faust → [redacted].
-    public static int [redacted] => (ConfigEntries[nameof([redacted])] as ConfigEntry<int>)?.Value ?? 0x3FF;
-    public static void Set[redacted](int v) => SetInt(nameof([redacted]), v);
-    // How far (metres) the [redacted] reach. Default 25; raise it to tag objects further from the player.
-    public static int [redacted] => UnityEngine.Mathf.Clamp((ConfigEntries[nameof([redacted])] as ConfigEntry<int>)?.Value ?? 25, 5, 80);
-    public static void Set[redacted](int v) => SetInt(nameof([redacted]), UnityEngine.Mathf.Clamp(v, 5, 80));
     // Faust bar charts: stretch to fill the panel width (true, default = dynamic) vs a compact, left-anchored
     // static width (false). Set via Faust → Settings.
     public static bool FaustChartStretch => (ConfigEntries[nameof(FaustChartStretch)] as ConfigEntry<bool>)?.Value ?? true;
@@ -1388,11 +1373,7 @@ public class Settings
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowBeelzActionBarOverlay),   false, "Whether the Beelz Action Bar overlay (on-screen buttons + cooldown rings for Beelzebub hotkey abilities beyond the 6 spell slots) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowBeelzSummonsOverlay),     false, "Whether the Beelz Summons overlay (one-click stash/restore + recall/clear for your Beelzebub summons) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowUrielSharedOverlay),       false, "Whether the Uriel \"Nearby Public Storage\" overlay (client-side list of Uriel-shared containers/cells around you) was visible at last logout.");
-        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(Show[redacted]),          false, "Whether the Faust \"[redacted]\" overlay (client-side HUD showing what your cursor is over + a [redacted]s list) was visible at last logout.");
-        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof([redacted]),          false, "Whether the Faust [redacted]s (a floating name drawn over each [redacted]'s position) were visible at last logout. Restored automatically on UI bring-up.");
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustQueryCooldownSeconds),      5,     "Minimum seconds between repeat Faust server queries of the same kind (anti-spam — a fast double-click or held click won't fire a second request until this elapses). Protects the server when many players query at once. 0 disables. Default 5.");
-        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof([redacted]),         0x3FF,"Bitmask of object categories shown by the Faust [redacted] / [redacted] (Ore=1, Wood=2, Grass=4, Plant=8, Flower=16, Grave=32, Tech=64, OtherResource=128, Container=256, Prison=512, Other=1024, Castle=2048; default 1023 = all resources + containers + prisons, Castle off). Edited via the per-category toggles in Faust → [redacted].");
-        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof([redacted]),               25,    "How far (metres, 5–80) the Faust [redacted] reach. Default 25; raise it to tag objects further from the player (they only label if within this distance AND on-screen). Set via Faust → [redacted].");
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustChartStretch),              true,  "Faust bar charts: ON = stretch the bars to fill the panel width (dynamic); OFF = a compact, left-anchored static width. Changes apply when the chart re-renders (switch view or Refresh). Set via Faust → Settings.");
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustChartColor),                0,     "Color theme for Faust bar charts / graphs: 0=Green, 1=Teal, 2=Blue, 3=Red, 4=Amber, 5=Violet. Applies when a chart re-renders. Set via Faust → Settings → Charts.");
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustHeatGradient),              1,     "Faust heat-map color ramp (low→high traffic): 0=Theme (black→chart color), 1=Heat (black→red→yellow→white), 2=Green (black→green→white), 3=Mono (black→white). Set via Faust → Settings → Heat map.");
@@ -1471,7 +1452,6 @@ public class Settings
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(BeelzActionBarOverlayTransparency), 0.4f, "Beelz Action Bar overlay background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(BeelzSummonsOverlayTransparency), 0.4f, "Beelz Summons overlay background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(UrielSharedOverlayTransparency), 0.4f, "Uriel Nearby Public Storage overlay background transparency (0.0=solid, 1.0=invisible).");
-        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof([redacted]Transparency), 0.4f, "Faust [redacted] background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(UrielObjectSpawnerOverlayTransparency), 0.4f, "Uriel object-spawn palette overlay background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(BeelzTransformOverlayTransparency), 0.4f, "Beelz Transforms overlay background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatWindowOverlayTransparency), 0.3f, "Tabbed chat window background transparency (0.0=solid, 1.0=invisible).");

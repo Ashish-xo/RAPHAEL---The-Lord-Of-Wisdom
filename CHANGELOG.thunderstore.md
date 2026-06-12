@@ -3,6 +3,10 @@
 Raphael began as **BloodCraftHub** (v0.1 → v0.30). Condensed milestone history below; full per-patch detail
 lives in [`CHANGELOG.md`](https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom/blob/main/CHANGELOG.md).
 
+## 0.51.0 — Compliance update
+- A compliance-only release that brings Raphael into line with the V Rising modding community's guidelines.
+  No new features and no other behavior changes.
+
 ## 0.47 – 0.50 — Faust ApiVersion 17, chart & settings polish, chat scrolling
 - **Faust through ApiVersion 17** — a player-position **heat map** (cold→hot gradient, full-map scale, detail
   control), **region fill-% over time** (per-day matrix + per-region trends), **New vs returning** as two-color
@@ -36,15 +40,14 @@ lives in [`CHANGELOG.md`](https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom/
 - New **FAUST** tab group, handshake-gated like Beelzebub/Uriel, surfacing the server-side **Faust** mod:
   **Castle Info / Open Plots / All Plots / Decay Watch / Castle Resources** (ownership, region, size, decay
   timers, abandoned-base housekeeping, container raid-intel), **Player Info** (playtime, frequency, busiest
-  hour, days-idle), **Player Positions**, **[redacted]** (client-side scan + [redacted] + [redacted]),
-  and a **Clans** tab (clanned-vs-solo split + per-clan rosters).
+  hour, days-idle), **Player Positions**, and a **Clans** tab (clanned-vs-solo split + per-clan rosters).
 - **Server Stats + reporting dashboards** — playtime leaderboard, concurrency graph, activity charts (by hour,
   by day of week, daily/weekly trend, new players, session lengths), and server-health rollups (DAU/WAU/MAU +
   retention, player recency, peak concurrency, population by region). Per-player versions of the activity
   charts live in Player Info.
 - All Faust screens are ApiVersion-gated (show a "needs newer Faust" note on older servers) and queries respect
   an anti-spam cooldown. Tracks Faust through **v0.12.0 / ApiVersion 11**.
-- Plus assorted fixes across the arc (region-sentinel handling, [redacted] category filter, a map-probe crash).
+- Plus assorted fixes across the arc (region-sentinel handling, a map-probe crash).
 
 ## 0.30.0 — Renamed: BloodCraftHub → Raphael, Lord of Wisdom
 - Rebranded to **Raphael, Lord of Wisdom** to reflect that it serves Bloodcraft, Beelzebub, Uriel,

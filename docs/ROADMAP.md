@@ -98,9 +98,6 @@ while giving translated users ~90% of the value.
   client already receives (`ChatMessageServerEvent`: type + sender + timestamp).
   Open design decision: integrate into the *native* game chat vs. a docked
   Raphael-styled surface (see discussion).
-- **Resource-node overlays (accessibility)** — *Spike.* Screen-space markers for
-  [redacted] nodes, colorblind-friendly (shape/label, not color-only).
-  Prototype to settle entity-identification + per-frame perf before committing.
 - **Map: castle-heart timers + plot availability/size** — *Deferred (v0.18+,
   dual-component).* Static plot sizes (`CastleTerritory.WorldBounds`) are
   map-fixed → client-renderable/scrapeable; live availability + heart timers

@@ -42,7 +42,7 @@
   default server-side (no client change); **13** (Faust 0.14) adds the §8 batch — `castleinfo`
   `floors`/`clan`/`items`, `resources` `prisoners=` + `[FAUST:prisoner]` rows, a `clanmembers` endpoint,
   `daily` `new=`/`returning=`, and `access`/`usage` admin endpoints (`FaustState.SupportsApi13`). Feature keys
-  parsed: `playerpositions, castleinfo, playerinfo, plotavailability, [redacted], castleresources, stats,
+  parsed: `playerpositions, castleinfo, playerinfo, plotavailability, castleresources, stats,
   allcastles, decaywatch, clans`.
 
 ## Query shapes consumed (ApiVersion 7, +8)
@@ -106,32 +106,14 @@ Raphael folds it via `CleanRegion` at parse time for ALL of them (castle/plot we
 in 0.37.x), then `FaustRegionCell` shows empty as "(outside map)" and positions as "—". If Faust ever promotes `admin status` to a `[FAUST:*]` wire shape, parse it into a slot and
 render it here instead of relying on the chat reply.
 
-## Remaining / next-phase candidates (need an ECS spike)
+## Remaining / next-phase candidates
 
-These three are deliberately **not** built yet because each requires reading live client ECS entities
-(IL2CPP finalizer-crash surface) and, for resource nodes, a component whose availability in the client
-`VampireReferenceAssemblies` is unverified (`[redacted]` only appears in server-side
-reference code). Each should follow the `SharedContainerDetector` / `AbilityIconResolver` crash
-discipline (client-null gate, lazy `ComponentType`, `em.Exists`, fault circuit-breaker, world-teardown
-reset) and be spiked behind a feature flag first:
+> **Compliance note (v0.51.0):** any client-side reading of live local-world entities is **off the table**
+> for this mod and must not be (re)built. Candidates that relied on it have been dropped. Client features
+> are limited to rendering data the server explicitly sends over the Faust protocol.
 
-- **[redacted] / [redacted]**: ✅ **BUILT** — `Services/Faust/[redacted].cs` reads the
-  local character's `EntityInput.HoveredEntity` (client-side; KindredCommands/Eclipse precedent) →
-  PrefabGUID → name, and `UI/ModContent/[redacted].cs` renders a draggable HUD (hover line +
-  nearby list). This is also the reliable resource-node identifier (point at it → its name; logged under
-  diagnostics). Crash discipline per `AbilityIconResolver`.
-- **`[redacted]` (#5) — client-side "[redacted]"**: ✅ **BUILT** — `Services/Faust/[redacted].cs`
-  + the **[redacted]** tab. Anchors two narrow `EntityQuery`s (`InventoryOwner+Translation` for
-  containers/stations, `[redacted]+Translation` for resource nodes), classifies, resolves
-  names via `FaustNames`, sorts by distance, caps at 200. All the candidate types compiled against the
-  client assemblies; **resource-node replication to the client is still unverified in-game** — if the game
-  doesn't ghost `[redacted]`, that query returns empty (containers still work), hence the
-  "experimental" label. Teardown reset registered in `InitializationPatch`.
-- **Player Positions map overlay**: plot `[FAUST:pos]` coords on a draggable map canvas (the list is
-  shipped; rendering is the open design item per the contract).
-- **Hover-to-identify for `pinfo`**: read the SteamID/name off the entity under the cursor, then call
-  `.faust api pinfo`. Pure client-side entity read.
-
+- **Player Positions map overlay**: plot `[FAUST:pos]` coords (server-provided) on a draggable map canvas
+  (the list is shipped; rendering is the open design item per the contract).
 - **Item icons**: the resource table shows names + GUIDs; adding item-icon sprites needs an item-icon
   resolver (a different managed component than `AbilityTooltipData.Icon`) — small ECS spike.
 

@@ -362,9 +362,7 @@ Admins (esp. PvP) want to see **who can use Faust and how it's being used**. Two
 - Both admin-only; both pure server-side accounting Faust already tracks for its cost/cooldown gates.
 
 ### Raphael-side fixes shipped alongside (no Faust dependency)
-- **NPCs miscategorised as "Ore & stone"** in [redacted] was a **Raphael** classifier bug (a stone golem's
-  name contains "stone"), now fixed client-side with a creature/NPC guard — no Faust change needed. If specific
-  creatures still slip through, the `[Faust][diag] nearby:` log lines pin the exact prefab names to add.
+- _(A Raphael-side client classifier note that previously lived here was dropped in v0.51.0 for compliance.)_
 
 ## 9. ✅ DELIVERED by Faust (0.15.0 / ApiVersion 14) — tester batch (2026-06-11, v0.50.0): drill-down tables + per-player series under the charts
 

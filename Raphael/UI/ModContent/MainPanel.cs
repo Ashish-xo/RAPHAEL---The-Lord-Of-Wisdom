@@ -359,7 +359,6 @@ public partial class MainPanel : ResizeablePanelBase
                 (PanelType.FaustPlayerInfoTab,   "Player Info"),
                 (PanelType.FaustClansTab,        "Clans"),
                 (PanelType.FaustPositionsTab,    "Player Positions"),
-                (PanelType.[redacted],       "[redacted]"),
                 (PanelType.FaustStatsTab,        "Server Stats"),
                 (PanelType.FaustSettingsTab,     "Settings"),
                 (PanelType.FaustAdminControlTab, "Admin: Control"),
@@ -2010,9 +2009,6 @@ public partial class MainPanel : ResizeablePanelBase
                     break;
                 case PanelType.FaustPositionsTab:
                     BuildFaustPositionsTab(page);
-                    break;
-                case PanelType.[redacted]:
-                    Build[redacted](page);
                     break;
                 case PanelType.FaustStatsTab:
                     BuildFaustStatsTab(page);

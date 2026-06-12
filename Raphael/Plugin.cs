@@ -170,11 +170,6 @@ public class Plugin : BasePlugin
         // a transition frame. See BCHubUIManager.TickOverlayAvailability.
         CoreUpdateBehavior.Actions.Add(UIManager.TickOverlayAvailability);
 
-        // Faust [redacted]s — a click-through layer that floats a name tag over each nearby
-        // object's world position. The ticker is a no-op (one bool read) unless Settings.[redacted]
-        // is on; it builds its container lazily and persists visibility via the setting (no manager wiring).
-        Raphael.UI.ModContent.[redacted].EnsureTickerRegistered();
-
         // 0.18: Beelzebub detection/handshake + event-driven re-fetch driver. Sends
         // `.beelz api version` with back-off once the player is in-world; gates the
         // Beelzebub tab group on a ready=1 ACK. No-op (single bool check) once presence

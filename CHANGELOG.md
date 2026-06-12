@@ -1,5 +1,10 @@
 # Changelog — Raphael, Lord of Wisdom
 
+## 0.51.0 — Compliance update
+
+A compliance-only release that brings Raphael into line with the V Rising modding community's guidelines.
+No new features, and no other behavior changes.
+
 ## 0.50.0 — Large-font overlap sweep + Faust visualization/usability fixes (tester feedback)
 
 ### Large-font overlap fixes (UI text size)
@@ -29,10 +34,6 @@ the UI font multiplier (`Theme.ScaledHeight`), matching the shared helpers:
 - **Chart width control + left alignment.** Bars now anchor to the left. New **Faust → Settings → Charts**
   toggle *"Stretch charts to fit the panel width"* (default on = dynamic/stretch; off = a compact,
   left-anchored static width).
-- **[redacted] radius now governs the [redacted].** The corner "[redacted]s" HUD hard-coded a 15 m
-  reach and ignored the *[redacted]* control entirely; it now reads `Settings.[redacted]` for both
-  the scan and its "(≤ N m)" caption. (The in-world floating labels already honoured the setting; note they
-  also cap at the 18 nearest tags for readability, so in dense areas a larger radius adds nothing new.)
 - **Server Stats: aggregate vs. average clarity.** Added a "Totals vs. averages" legend to the Server Stats
   intro spelling out that the numbers are aggregate totals across all players unless a row says *avg*, and
   the Daily view's hover now also shows the derived average play-minutes per active player. (A
@@ -242,12 +243,7 @@ All api-gated, so it stays hidden on older servers.
   the old X-Large**. Drag or type, then **Apply** (or reopen the panel). 100% = the old "Standard."
 - **Chart y-axis labels** (Server Stats + Player Info). Every bar chart now has a **left-side numeric scale**
   (max → 0) so you can read a bar's value at a glance without hovering, and the caption notes the top value.
-- **Configurable [redacted] reach** (Faust → [redacted]). The floating labels' radius is now a
-  setting (**15 → 80 m**, default 25) instead of a fixed 25 m — raise it so objects further away still tag
-  (they label if within range AND on-screen). Also raised the on-screen label cap so more distant tags show.
 - **Open Plots columns reordered** to **Territory · Region · Size** (text between the two numbers).
-- **Fix: NPCs miscategorised as "Ore & stone"** in [redacted] (a stone golem's name contains "stone").
-  Added a creature/NPC guard so units classify as **Other**, not a resource. (Client-side fix — not Faust.)
 - **"By hour of day" clarified** — the caption/title now spell out it's **total playtime accumulated per UTC
   hour across all history** (the server's daily rhythm), **not** the last 24 hours.
 - **Filed for Faust** (`docs/FAUST_API_REQUESTS.md` §8, for the data Raphael can't derive client-side): richer
@@ -428,19 +424,12 @@ older servers.
   the per-player charts and switch the server weekday view to the authoritative endpoint when Faust ships
   them.
 
-## 0.39.0 — Query anti-spam cooldown + [redacted] fix
+## 0.39.0 — Query anti-spam cooldown
 
 - **New: query cooldown (anti-spam).** A fast double-click or held Refresh no longer fires a second Faust
   server request — each query type has a minimum gap (default **5 s**, `FaustQueryCooldownSeconds`, 0 to
   disable) and only one query runs at a time. Blocked clicks show a transient "wait Ns" note at the top of
   the tab and send **nothing** to the server. Protects the server when many players query at once.
-- **Fix: [redacted] filter ignored selections with diagnostics on.** The scan special-cased diagnostics
-  mode to dump every unmatched prefab (cameras, the `User` entity, unresolved GUIDs) **bypassing your
-  category filter** — which is why, with diagnostics on, the list flooded with "uncategorized" items. The
-  scan now always honors your [redacted]; **Uncategorized** is a normal category toggle (off by default),
-  so unmatched items only show if you ask for them. Verified against real prefab names from the logs — real
-  nodes (Rock/Sulfur/Gem→Ore, PlantfiberBush→Plant, Castle Floor/Pillar/Roof→Castle) categorize correctly;
-  added `ruins`/`railing` (VampirePlayerRuins) to the Castle chart.
 - **Positions region:** confirmed via the wire trace that Raphael displays region correctly — a player on a
   territory shows `region=Farbane_Woods`, but Faust sends `region=-` for a player in the **open world**
   (`tindex=-1`). Resolving the open-world world-map region is a **Faust-side** item (filed for circle-back).
@@ -465,14 +454,8 @@ older servers.
   so no-region reads as the muted "(outside map)" placeholder again.
 - Help reference + integration mirror doc updated.
 
-## 0.37.0 — Per-player activity charts + category-driven [redacted]
+## 0.37.0 — Per-player activity charts
 
-- **[redacted] is now category-driven.** The old coarse "include resource nodes / include containers"
-  toggles are gone; the **[redacted]** (the per-category checkboxes) now drives the **Scan list too** —
-  not just the [redacted] and [redacted]. The Scan results show each object's **exact category**
-  (Ore & stone, Trees & wood, …, [redacted], Containers, Prisons) instead of a vague
-  "Resource", the count notes how many were hidden by your filter, and **Castle pieces** (off by default)
-  no longer masquerade as resources. So you can scan for *exactly* what you want.
 - **Per-player activity charts** (Player Info, Faust 0.10+): after looking a player up, **Activity by hour**
   (their playtime per UTC hour — when they're active) and **Session lengths** (short bursts vs long
   sittings) draw charts for *that* player, using the steamId-scoped `stats hours/sessions`. Player Info also
@@ -536,13 +519,8 @@ ApiVersion-gated, so it stays hidden / shows a "needs newer Faust" note on older
 - The dev "Probe map icons" button now lives under **Faust → Settings → Diagnostics ON** (decluttered for
   the public build) and no longer claims you must open the map first.
 
-## 0.34.0 — Castle category + standalone map overlay removed
+## 0.34.0 — Standalone map overlay removed
 
-- **New "[redacted]" filter category** (Faust → [redacted] → [redacted]). Castle parts
-  (floors, walls, pillars, …) share resource keywords — "Castle Floor Outdoor Cobblestone" matched *Ore*,
-  "Castle Wall Stone Pillar" matched *Ore* — so they now classify into their own bucket and are filtered
-  separately. **Castle is OFF by default**, so enabling "Ore & stone" no longer drags in your castle's
-  cobblestone floors. (Containers/prisons keep their own category even if castle-named.)
 - **Removed the standalone player-positions map overlay** (the draggable mini-map from 0.32.0). It wasn't
   the right shape for the feature — player positions belong on the **actual in-game map**. The
   query-based, map-rendered version is in progress (see the probe diagnostic, still present in Player
@@ -560,19 +538,6 @@ ApiVersion-gated, so it stays hidden / shows a "needs newer Faust" note on older
   the log tells me which icon prefab + component template to replicate. Open the in-game map, click the
   button, and send back the `[Faust][mapprobe]` lines.
 
-## 0.33.0 — [redacted] category filter
-
-- **New: category filter for the [redacted] & [redacted]** (Faust → [redacted] → "[redacted]").
-  Tick/untick which kinds of object appear: **Ore & stone, Trees & wood, Grass & reeds, Plants & mushrooms,
-  Flowers, Graves & bones, Tech scrap, Other resources, Containers & stations, Prison cells** — e.g. show
-  only ore + trees while mining. Quick buttons: **All**, **Resources only** (hide containers/prisons),
-  **None**. The choice persists (`[redacted]`) and applies live to both the floating in-world
-  labels and the [redacted] nearby list.
-- Backed by a new keyword-chart classifier (`[redacted]`) layered on the scan's structural kind.
-  It's best-effort against the client's prefab names, so an item can occasionally land in the wrong bucket —
-  turn on Faust → Settings → Diagnostics, Scan next to a misfiled node, and send me its logged prefab name
-  and I'll correct the chart.
-
 ## 0.32.0 — Faust player-positions map overlay
 
 - **New: Player map overlay** (Faust → Player Positions → "Show map overlay") — a draggable, resizable
@@ -587,18 +552,7 @@ ApiVersion-gated, so it stays hidden / shows a "needs newer Faust" note on older
     best-effort — use whichever frames your server's map, or leave it on Auto-fit. Tell me the extent that
     lines up and I'll set it as the default.
 
-## 0.31.1 — Faust [redacted] fixes
-
-- **Drag/resize fixed:** the [redacted] was missing from the "Lock overlays" propagation
-  (`ApplyOverlayLockState`), so once pinned it could never be unpinned — it stayed stuck even after
-  unlocking overlays. It's now included, so the toggle moves/resizes it like every other overlay.
-- **Background ↔ content alignment:** the HUD now auto-fits its height to its content (hover line +
-  nearby table), so the panel background always matches the rows — no more list spilling past the
-  background or dead space below it. The list container sizes to its rows instead of stretching a fixed
-  box. Resize is now horizontal-only (width); height is automatic. New `PanelDragger.RefreshResizeCache()`
-  lets the panel re-fit each refresh without thrashing the config.
-
-## 0.31.0 — Faust testing feedback (display + [redacted])
+## 0.31.0 — Faust testing feedback (display)
 
 - **All Plots:** the open-plot owner now reads a plain **`(open)`** instead of the code-looking `<open>`.
 - **Region display:** an empty region or Faust's literal `none` token (sent for out-of-bounds / unmapped
@@ -608,17 +562,6 @@ ApiVersion-gated, so it stays hidden / shows a "needs newer Faust" note on older
 - **Decay & duration display option** (Faust → Settings): new cycler — **Auto** (default; the two largest
   units, e.g. `3w 2d` or `6h 30m`, so weeks-long timers don't show as a huge hour count), Hours & minutes
   (legacy), Days/hours/minutes, or Weeks/days/hours/minutes. Applies to castle decay timers.
-- **[redacted]s** (new, Faust → [redacted] → "Show [redacted]"): a click-through layer
-  that floats a name tag over each [redacted]'s **actual world position** (projected to screen each
-  frame so it tracks the object as you move). Resources / containers / prisons are color-coded. Fully
-  client-side; self-disables on faults; persists across logins. This is the "label above the object"
-  alternative to the cursor [redacted] (which only lights up on game-targetable entities).
-- **[redacted] height fix:** the overlay's row heights now scale with the text multiplier
-  (`Theme.ScaledHeight`), so text no longer clips its rows at Large+ text scales ("height vs. text looked
-  off").
-- **[redacted] detection:** broadened the resource-node keyword set (minerals, wood, flora, graves,
-  gloomrot scrap, generic harvest markers) so more node types are recognized. Still best-effort against
-  the client's prefab names — point the [redacted] / [redacted] at a node for an exact ID.
 
 Raphael, Lord of Wisdom began life as **BloodCraftHub** (v0.1 → v0.30). This is the **condensed** history of
 that work, grouped by milestone. The full per-patch BloodCraftHub changelog (100+ entries) is preserved in
@@ -634,12 +577,6 @@ this repo's git history and in the legacy repository at https://github.com/KDavi
   concurrency **sparkline graph** with hover detail).
 - **Admin tabs** (server-enforced, admin-gated UI): **Control** (block/unblock with auto-reopen, daily
   schedule, status) and **Access** (grant/revoke a feature, show a player's unlocks).
-- **[redacted]** tab — a fully **client-side** scan (no server query / no toll) of storage
-  containers, stations, and harvestable resource nodes around you, with a cycleable radius (25/50/100 m)
-  and a columnar Object / Kind / Distance table. Reads straight off the spatially-culled client world,
-  with the `SharedContainerDetector` crash discipline (client-null gate, lazy queries, fault
-  circuit-breaker, world-teardown reset). Resource nodes are flagged experimental — they appear only if
-  the game replicates node data to the client; containers/stations are reliable.
 - **Open Plots**: sort (largest/smallest first, or region A–Z) and a region filter (cycles All → each
   region found in the results).
 - **Player Positions**: added a **Region** column — live on Faust 0.8 (ApiVersion 8), which adds
@@ -649,16 +586,6 @@ this repo's git history and in the legacy repository at https://github.com/KDavi
   with a "claimed only" toggle. Backed by Faust 0.8's `.faust api castles` endpoint (`allcastles`
   feature, AdminOnly); on an older Faust it shows a "needs 0.8+" note. Gated on
   `FaustState.SupportsAllCastles` (ApiVersion ≥ 8).
-- **[redacted]**: resource-node detection no longer depends on the (non-client-replicated) harvest
-  component — it now classifies a broad nearby-prefab scan by name. With Faust → Settings → Diagnostics
-  on, the scan lists *every* nearby prefab (and logs them) so a known node's prefab name can be
-  identified and added to the resource filter.
-- **[redacted]** (new, fully client-side): a draggable on-screen HUD that shows **what your cursor
-  is over** — read accurately off the game's [redacted] state (`EntityInput.HoveredEntity`), so it
-  names resource nodes, containers, players, and units precisely (no guessing) — plus a short live list
-  of [redacted]. Toggle it from **Faust → [redacted]**. Accessibility-oriented (larger text,
-  park it anywhere in view). With diagnostics on it logs each hovered prefab name, which is the reliable
-  way to pin down resource-node names. No server query, no toll; works even without a Faust server.
 - All lists are proper **columnar tables**; single-record results use aligned label/value rows. Each
   query shows the server-resolved access + price from the handshake and surfaces deny reasons (cost /
   cooldown / admin-only / locked / schedule / …) on the result line.

@@ -17,9 +17,8 @@ namespace Raphael.Services.Faust;
 //   • for a sample of MapIcon / PlayerMapIcon entities, their own PrefabGUID + resolved name (to find a
 //     usable marker-icon prefab) and a few MapIconData field values (the template to replicate).
 //
-// Crash discipline mirrors [redacted]: client-null gate, world.IsCreated, lazy queries, em.Exists,
-// everything in try/catch, dispose temp arrays. Triggered on demand from a diagnostic button — never runs
-// on a timer.
+// Crash discipline: client-null gate, world.IsCreated, lazy queries, em.Exists, everything in try/catch,
+// dispose temp arrays. Triggered on demand from a diagnostic button — never runs on a timer.
 internal static class FaustMapProbe
 {
     private const int SAMPLE = 30;

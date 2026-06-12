@@ -89,7 +89,6 @@ public enum PanelType
     FaustPlayerInfoTab,     // player: playtime/frequency/peak-hour (self always; others gated)
     FaustClansTab,          // admin: clan composition (clanned vs solo split + per-clan rosters) — needs `.faust api clans` (api 11)
     FaustPositionsTab,      // admin: online player coordinates (sortable list) — Phase 2
-    [redacted],         // player: client-side scan of [redacted] (containers / resource nodes)
     FaustStatsTab,          // player: playtime leaderboard + concurrency series
     FaustSettingsTab,       // client-side Faust settings: diagnostics, availability readout
     FaustAdminControlTab,   // admin: block/unblock/schedule/status — Phase 2
@@ -113,7 +112,6 @@ public enum PanelType
     BeelzTransformOverlay,  // 0.20: browser-style transform overlay (double-click to transform + phase/revert)
     UrielSharedOverlay,     // 0.26: nearby public-storage badges (client-side detection of Uriel-shared containers)
     UrielObjectSpawnerOverlay, // 0.29: draggable quick-build palette of your unlocked Uriel objects (category cycler + per-row Spawn)
-    [redacted],       // client-side "[redacted]" HUD: what the cursor is over (EntityInput.HoveredEntity) + a [redacted]s list
 
     // Legacy panel identities from BloodCraftUI — kept so the existing
     // ResizeablePanelBase config keys (Panels/<PanelType>) survive a port.

@@ -139,8 +139,6 @@ public static class InitializationPatch
             TypingInputLock.OnWorldTeardown();   // 0.25.0: drop the input-context refs (the dying world's InputActionSystem takes the registration with it)
             Services.PlayerRosterService.OnWorldTeardown();
             Services.Uriel.SharedContainerDetector.OnWorldTeardown(); // 0.26: drop the shared-container query for the new world
-            Services.Faust.[redacted].OnWorldTeardown(); // drop the [redacted] queries for the new world
-            UI.ModContent.[redacted].OnWorldTeardown(); // drop the [redacted] container for the new world
             Core.Reset();                    // release Core's client world
             Plugin.ResetGameData();          // null Plugin._client (IsClientNull()=true) + allow re-bind on relog
             // 0.18.1: queue the UI hide so overlays/launcher don't linger over the main menu. PURE
