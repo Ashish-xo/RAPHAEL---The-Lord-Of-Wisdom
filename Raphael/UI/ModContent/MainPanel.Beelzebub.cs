@@ -143,6 +143,7 @@ public partial class MainPanel
     private TextMeshProUGUI _connBloodcraftReadout;   // Connection tab — Bloodcraft state line
     private TextMeshProUGUI _connBeelzReadout;        // Connection tab — Beelzebub state line
     private TextMeshProUGUI _connUrielReadout;        // Connection tab — Uriel state line (0.26)
+    private TextMeshProUGUI _connFaustReadout;        // Connection tab — Faust state line (0.50)
 
     // Hotkey-bind state.
     private string _beelzHotkeyName = "";
@@ -269,7 +270,7 @@ public partial class MainPanel
         void Col(string name, string text, int min, int pref, int flex, int fs)
         {
             var l = UIFactory.CreateLabel(row, name, text, TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(fs));
-            UIFactory.SetLayoutElement(l.GameObject, minWidth: min, preferredWidth: pref, flexibleWidth: flex, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(l.GameObject, minWidth: min, preferredWidth: pref, flexibleWidth: flex, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
             l.TextMesh.enableWordWrapping = false; l.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
         }
         string src = cap.Source == 'V' ? "<color=#FFD75A>V</color> " : "";
@@ -295,11 +296,11 @@ public partial class MainPanel
         {
             var l = UIFactory.CreateLabel(row, $"BeelzIdNone_{row.transform.childCount}", $"<color={Theme.MutedBodyHex}>—</color>",
                 TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(10));
-            UIFactory.SetLayoutElement(l.GameObject, minWidth: BEELZ_COL_ID_MIN, preferredWidth: BEELZ_COL_ID_PREF, flexibleWidth: 0, minHeight: 20, preferredHeight: 22, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(l.GameObject, minWidth: BEELZ_COL_ID_MIN, preferredWidth: BEELZ_COL_ID_PREF, flexibleWidth: 0, minHeight: Theme.ScaledHeight(20), preferredHeight: Theme.ScaledHeight(22), flexibleHeight: 0);
             return;
         }
         var btn = UIFactory.CreateButton(row, $"BeelzIdCopy_{g}_{row.transform.childCount}", g);
-        UIFactory.SetLayoutElement(btn.GameObject, minWidth: BEELZ_COL_ID_MIN, preferredWidth: BEELZ_COL_ID_PREF, flexibleWidth: 0, minHeight: 20, preferredHeight: 22, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(btn.GameObject, minWidth: BEELZ_COL_ID_MIN, preferredWidth: BEELZ_COL_ID_PREF, flexibleWidth: 0, minHeight: Theme.ScaledHeight(20), preferredHeight: Theme.ScaledHeight(22), flexibleHeight: 0);
         var t = btn.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (t != null) { t.fontSize = Theme.ScaledUI(10); t.color = new Color(0.62f, 0.82f, 1f); t.alignment = TextAlignmentOptions.MidlineLeft; t.enableWordWrapping = false; t.overflowMode = TextOverflowModes.Ellipsis; }
         TooltipHover.Attach(btn.GameObject, $"Click to copy this ability ID ({g}).");
@@ -359,7 +360,7 @@ public partial class MainPanel
         var row = UIFactory.CreateHorizontalGroup(parent, "BeelzAssignColHeader",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true,
             spacing: 4, padding: new Vector4(2, 2, 2, 2));
-        UIFactory.SetLayoutElement(row, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 18, preferredHeight: 20, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(row, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(18), preferredHeight: Theme.ScaledHeight(20), flexibleHeight: 0);
         PopulateBeelzAssignColumnHeader(row, lastCol, lastColW, copyCol);
         return row;
     }
@@ -375,7 +376,7 @@ public partial class MainPanel
         {
             var l = UIFactory.CreateLabel(row, $"BeelzAsgCol_{t}", $"<color={Theme.MutedBodyHex}><b>{t}</b></color>",
                 TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
-            UIFactory.SetLayoutElement(l.GameObject, minWidth: min, preferredWidth: pref, flexibleWidth: flex, minHeight: 16, preferredHeight: 18, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(l.GameObject, minWidth: min, preferredWidth: pref, flexibleWidth: flex, minHeight: Theme.ScaledHeight(16), preferredHeight: Theme.ScaledHeight(18), flexibleHeight: 0);
             l.TextMesh.enableWordWrapping = false; l.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
         }
         Col("Ability",   BEELZ_COL_ABILITY_MIN, BEELZ_COL_ABILITY_PREF, 1);
@@ -800,14 +801,14 @@ public partial class MainPanel
         var row = UIFactory.CreateHorizontalGroup(parent, "BeelzScanRow",
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true, spacing: 8, padding: new Vector4(0, 2, 0, 0));
-        UIFactory.SetLayoutElement(row, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(row, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
 
         // The Admin: Abilities table scans the ADMIN `abilities-all` scope (every ability incl. disabled);
         // the Bestiary/Loadout scan the player collectible scope.
         bool adminScope = target == BeelzScanTarget.AbilityTable;
 
         var btn = UIFactory.CreateButton(row, "BeelzScanAll", "Scan all abilities");
-        UIFactory.SetLayoutElement(btn.GameObject, minWidth: 130, preferredWidth: 150, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(btn.GameObject, minWidth: 130, preferredWidth: 150, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         var bt = btn.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (bt != null) { bt.fontSize = Theme.ScaledUI(12); bt.alignment = TextAlignmentOptions.Center; }
         TooltipHover.Attach(btn.GameObject, adminScope
@@ -827,7 +828,7 @@ public partial class MainPanel
         // Status on its OWN full-width line under the button. The pre-scan copy ("Not scanned yet — …")
         // is long; info labels don't wrap or clip, so in the button row it overflowed across the panel.
         var status = AddInfoLabel(parent, "BeelzScanStatus", BeelzScanStatusText(adminScope), FontStyles.Italic, Theme.ScaledUI(11));
-        UIFactory.SetLayoutElement(status.gameObject, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(status.gameObject, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         switch (target)
         {
             case BeelzScanTarget.Loadout:      _beelzLoadoutScanStatus  = status; break;
@@ -848,7 +849,7 @@ public partial class MainPanel
         var presetRow = UIFactory.CreateHorizontalGroup(parent, "BeelzScanPresets",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true,
             spacing: 6, padding: new Vector4(0, 0, 0, 2));
-        UIFactory.SetLayoutElement(presetRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(presetRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         AddBeelzControlLabel(presetRow, "BeelzScanPresetsLbl", "Quick scan:");
 
         // (display label, filter key, filter value) — each is one server-side slice load.
@@ -872,7 +873,7 @@ public partial class MainPanel
         var presetDdObj = UIFactory.CreateDropdown(presetRow, "BeelzScanPresetDd", out var presetDd,
             presetLabels[0], Theme.ScaledUI(11),
             i => { if (i >= 0 && i < presets.Count) presetSel = i; }, presetLabels);
-        UIFactory.SetLayoutElement(presetDdObj, minWidth: 150, preferredWidth: 180, flexibleWidth: 0, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(presetDdObj, minWidth: 150, preferredWidth: 180, flexibleWidth: 0, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         BeelzDropdownNoWrap(presetDd); presetDd.SetValueWithoutNotify(0);
         Raphael.UI.Forms.FormDropdownRegistry.Register(presetDd);
         TooltipHover.Attach(presetDdObj,
@@ -1002,7 +1003,7 @@ public partial class MainPanel
         var btn = UIFactory.CreateButton(parent, "BeelzRefreshBtn", "Refresh");
         UIFactory.SetLayoutElement(btn.GameObject,
             minWidth: 90, preferredWidth: 110, flexibleWidth: 0,
-            minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var t = btn.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (t != null) { t.fontSize = Theme.ScaledUI(12); t.alignment = TextAlignmentOptions.Center; }
         TooltipHover.Attach(btn.GameObject, tooltip);
@@ -1042,7 +1043,7 @@ public partial class MainPanel
         var lbl = UIFactory.CreateLabel(parent, name, $"<color={Theme.MutedBodyHex}>{text}</color>",
             TextAlignmentOptions.MidlineRight, color: null, fontSize: Theme.ScaledUI(11));
         UIFactory.SetLayoutElement(lbl.GameObject,
-            minWidth: 44, preferredWidth: 48, flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minWidth: 44, preferredWidth: 48, flexibleWidth: 0, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         lbl.TextMesh.enableWordWrapping = false;
         lbl.TextMesh.overflowMode = TextOverflowModes.Overflow;
         lbl.TextMesh.fontStyle = FontStyles.Italic;
@@ -1089,7 +1090,7 @@ public partial class MainPanel
             FontStyles.Bold, fontSize: Theme.ScaledUI(13));
         UIFactory.SetLayoutElement(_beelzBestiaryStatsLabel.gameObject,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
 
         var statusRow = UIFactory.CreateHorizontalGroup(statusCard, "BeelzBestiaryStatusRow",
             forceExpandWidth: true, forceExpandHeight: false,
@@ -1097,7 +1098,7 @@ public partial class MainPanel
             spacing: 6, padding: new Vector4(0, 2, 0, 0));
         UIFactory.SetLayoutElement(statusRow,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 30, preferredHeight: 32, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(30), preferredHeight: Theme.ScaledHeight(32), flexibleHeight: 0);
 
         AddBeelzRefreshButton(statusRow,
             "Re-sync captures + progress from the server (api list / progress).",
@@ -1121,12 +1122,12 @@ public partial class MainPanel
             spacing: 6, padding: new Vector4(0, 0, 0, 0));
         UIFactory.SetLayoutElement(filterRow,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 30, preferredHeight: 32, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(30), preferredHeight: Theme.ScaledHeight(32), flexibleHeight: 0);
 
         _beelzBestiarySearchInput = UIFactory.CreateInputField(filterRow, "BeelzBestiarySearch", "Filter by ability name…");
         UIFactory.SetLayoutElement(_beelzBestiarySearchInput.GameObject,
             minWidth: 140, preferredWidth: 200, flexibleWidth: 1,
-            minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         _beelzBestiarySearchInput.OnValueChanged += (string val) =>
         {
             _beelzBestiarySearch = val ?? "";
@@ -1137,7 +1138,7 @@ public partial class MainPanel
         _beelzBestiaryFilterButton = UIFactory.CreateButton(filterRow, "BeelzBestiaryFilterBtn", FormatBeelzBestiaryFilter());
         UIFactory.SetLayoutElement(_beelzBestiaryFilterButton.GameObject,
             minWidth: 108, preferredWidth: 124, flexibleWidth: 0,
-            minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         var filterTxt = _beelzBestiaryFilterButton.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (filterTxt != null) { filterTxt.fontSize = Theme.ScaledUI(12); filterTxt.alignment = TextAlignmentOptions.Center; }
         TooltipHover.Attach(_beelzBestiaryFilterButton.GameObject, "Cycle: All → Captured → Missing.");
@@ -1168,11 +1169,11 @@ public partial class MainPanel
         // #5: pagination controls (the list pages instead of capping at 200).
         var pageRow = UIFactory.CreateHorizontalGroup(filterCard, "BeelzBestiaryPageRow",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 2, 0, 0));
-        UIFactory.SetLayoutElement(pageRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(pageRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         _beelzBestiaryPrevButton = AddBeelzSmallButton(pageRow, "BeelzBestiaryPrev", "Prev",
             "Previous page.", () => { if (_beelzBestiaryPage > 0) { _beelzBestiaryPage--; RebuildBeelzBestiaryRows(); } }, 64);
         _beelzBestiaryPageLabel = AddInfoLabel(pageRow, "BeelzBestiaryPageLbl", "", FontStyles.Normal, Theme.ScaledUI(12));
-        UIFactory.SetLayoutElement(_beelzBestiaryPageLabel.gameObject, minWidth: 140, preferredWidth: 200, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(_beelzBestiaryPageLabel.gameObject, minWidth: 140, preferredWidth: 200, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         _beelzBestiaryPageLabel.alignment = TextAlignmentOptions.Center;
         _beelzBestiaryNextButton = AddBeelzSmallButton(pageRow, "BeelzBestiaryNext", "Next",
             "Next page.", () => { _beelzBestiaryPage++; RebuildBeelzBestiaryRows(); }, 64);
@@ -1223,11 +1224,11 @@ public partial class MainPanel
         var row = MakeBeelzRow(card, "BeelzClearAllRow");
         string typed = "";
         var input = UIFactory.CreateInputField(row, "BeelzClearAllInput", "type confirm");
-        UIFactory.SetLayoutElement(input.GameObject, minWidth: 120, preferredWidth: 150, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(input.GameObject, minWidth: 120, preferredWidth: 150, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         input.OnValueChanged += (string v) => typed = v ?? "";
 
         var status = AddInfoLabel(row, "BeelzClearAllStatus", "", FontStyles.Italic, Theme.ScaledUI(11));
-        UIFactory.SetLayoutElement(status.gameObject, minWidth: 120, preferredWidth: 180, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(status.gameObject, minWidth: 120, preferredWidth: 180, flexibleWidth: 1, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
 
         AddBeelzSmallButton(row, "BeelzClearAllWipe", "Wipe abilities",
             "Permanently delete ALL captures + slot bindings. Disabled until you type 'confirm' in the box.",
@@ -1476,7 +1477,7 @@ public partial class MainPanel
     {
         bool collapsed = _beelzBestiaryCollapsed.Contains(gk);
         var btn = UIFactory.CreateButton(_beelzBestiaryRowContainer, $"BeelzBestGrp_{gk}", $"{(collapsed ? "[+]" : "[–]")}  {gk}  ({count})");
-        UIFactory.SetLayoutElement(btn.GameObject, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 20, preferredHeight: 22, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(btn.GameObject, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(20), preferredHeight: Theme.ScaledHeight(22), flexibleHeight: 0);
         var t = btn.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (t != null) { t.fontSize = Theme.ScaledUI(11); t.alignment = TextAlignmentOptions.MidlineLeft; t.color = new Color(0.62f, 0.82f, 1f); t.fontStyle = FontStyles.Bold; }
         TooltipHover.Attach(btn.GameObject, "Click to collapse / expand this group.");
@@ -1498,7 +1499,7 @@ public partial class MainPanel
         {
             var l = UIFactory.CreateLabel(row, $"BeelzBestCol_{t}", $"<color={Theme.MutedBodyHex}><b>{t}</b></color>",
                 TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
-            UIFactory.SetLayoutElement(l.GameObject, minWidth: min, preferredWidth: pref, flexibleWidth: flex, minHeight: 16, preferredHeight: 18, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(l.GameObject, minWidth: min, preferredWidth: pref, flexibleWidth: flex, minHeight: Theme.ScaledHeight(16), preferredHeight: Theme.ScaledHeight(18), flexibleHeight: 0);
             l.TextMesh.enableWordWrapping = false; l.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
         }
         Col("",        20, 20, 0);
@@ -1516,7 +1517,7 @@ public partial class MainPanel
         void Col(string name, string text, int min, int pref, int flex, int fs)
         {
             var l = UIFactory.CreateLabel(row, name, text, TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(fs));
-            UIFactory.SetLayoutElement(l.GameObject, minWidth: min, preferredWidth: pref, flexibleWidth: flex, minHeight: 20, preferredHeight: 22, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(l.GameObject, minWidth: min, preferredWidth: pref, flexibleWidth: flex, minHeight: Theme.ScaledHeight(20), preferredHeight: Theme.ScaledHeight(22), flexibleHeight: 0);
             l.TextMesh.enableWordWrapping = false; l.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
         }
         bool offCat = r.Captured && BeelzState.CatalogLoaded && !BeelzState.TryGetCatalog(r.Name, out _);
@@ -1634,10 +1635,10 @@ public partial class MainPanel
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 0, 0, 0));
         UIFactory.SetLayoutElement(searchRow,
-            minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var searchInput = UIFactory.CreateInputField(searchRow, "BeelzAssignSearch", "Search name / unit / weapon / category…");
         UIFactory.SetLayoutElement(searchInput.GameObject,
-            minWidth: 200, preferredWidth: 360, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+            minWidth: 200, preferredWidth: 360, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         searchInput.OnValueChanged += (string v) => { _beelzAssignSearch = v ?? ""; RebuildBeelzLoadoutAssign(); };
 
         // Grouping row — structure the list into collapsible groups.
@@ -1645,7 +1646,7 @@ public partial class MainPanel
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 0, 0, 0));
         UIFactory.SetLayoutElement(groupRow,
-            minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         AddBeelzControlLabel(groupRow, "BeelzAssignGroupLbl", "Group:");
         _beelzAssignGroupButton = AddBeelzSmallButton(groupRow, "BeelzAssignGroup", FormatBeelzAssignGroup(),
             "Cycle grouping: off → Unit → Category → Kind → Weapon. A weapon-shared ability appears under EACH of its " +
@@ -1662,7 +1663,7 @@ public partial class MainPanel
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 0, 0, 0));
         UIFactory.SetLayoutElement(filterRow2,
-            minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         AddBeelzControlLabel(filterRow2, "BeelzAssignFilterLbl", "Filter:");
         _beelzAssignSourceButton = AddBeelzSmallButton(filterRow2, "BeelzAssignSrc", FormatBeelzAssignSource(),
             "Cycle source: All → V-Blood → Regular.",
@@ -1718,11 +1719,11 @@ public partial class MainPanel
         var selRow = UIFactory.CreateHorizontalGroup(card, "BeelzGroupSelRow",
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true, spacing: 8, padding: new Vector4(0, 0, 0, 0));
-        UIFactory.SetLayoutElement(selRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(selRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
 
         var editLbl = UIFactory.CreateLabel(selRow, "BeelzGroupLbl", $"<color={Theme.MutedBodyHex}>Editing:</color>",
             TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
-        UIFactory.SetLayoutElement(editLbl.GameObject, minWidth: 52, preferredWidth: 56, flexibleWidth: 0, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(editLbl.GameObject, minWidth: 52, preferredWidth: 56, flexibleWidth: 0, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
 
         var opts = BeelzGroupOptions();
         int sel = Mathf.Clamp(BeelzGroupIndexFromKey(_beelzSelectedGroup), 0, opts.Length - 1);
@@ -1738,13 +1739,13 @@ public partial class MainPanel
             "form; the server activates it automatically when you equip that weapon or enter that form.");
 
         _beelzLiveBadgeLabel = AddInfoLabel(selRow, "BeelzLiveBadge", "", FontStyles.Normal, Theme.ScaledUI(12));
-        UIFactory.SetLayoutElement(_beelzLiveBadgeLabel.gameObject, minWidth: 130, preferredWidth: 200, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(_beelzLiveBadgeLabel.gameObject, minWidth: 130, preferredWidth: 200, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         _beelzLiveBadgeLabel.overflowMode = TextOverflowModes.Ellipsis;
 
         var actRow = UIFactory.CreateHorizontalGroup(card, "BeelzGroupActions",
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 2, 0, 0));
-        UIFactory.SetLayoutElement(actRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(actRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
 
         AddBeelzConfirmButton(actRow, "BeelzClearGroup", "Clear set",
             "Clear ALL 6 slots of the set you're editing (one unslot per bound slot). Doesn't touch other sets or your captures.",
@@ -1752,13 +1753,13 @@ public partial class MainPanel
 
         var copyLbl = UIFactory.CreateLabel(actRow, "BeelzCopyLbl", $"<color={Theme.MutedBodyHex}>Copy from</color>",
             TextAlignmentOptions.MidlineRight, color: null, fontSize: Theme.ScaledUI(11));
-        UIFactory.SetLayoutElement(copyLbl.GameObject, minWidth: 62, preferredWidth: 68, flexibleWidth: 0, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(copyLbl.GameObject, minWidth: 62, preferredWidth: 68, flexibleWidth: 0, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
 
         var copyOpts = BeelzGroupOptions();
         int csel = Mathf.Clamp(BeelzGroupIndexFromKey(_beelzCopyFromGroup), 0, copyOpts.Length - 1);
         var copyObj = UIFactory.CreateDropdown(actRow, "BeelzCopyDropdown", out _beelzCopyDropdown,
             copyOpts[csel], Theme.ScaledUI(11), OnBeelzCopyFromChanged, copyOpts);
-        UIFactory.SetLayoutElement(copyObj, minWidth: 130, preferredWidth: 160, flexibleWidth: 0, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(copyObj, minWidth: 130, preferredWidth: 160, flexibleWidth: 0, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         BeelzDropdownNoWrap(_beelzCopyDropdown);
         _beelzCopyDropdown.SetValueWithoutNotify(csel);
         Raphael.UI.Forms.FormDropdownRegistry.Register(_beelzCopyDropdown);
@@ -1799,9 +1800,9 @@ public partial class MainPanel
         var row = UIFactory.CreateHorizontalGroup(card, "BeelzPresetRow",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true,
             spacing: 6, padding: new Vector4(0, 2, 0, 0));
-        UIFactory.SetLayoutElement(row, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(row, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var nameInput = UIFactory.CreateInputField(row, "BeelzPresetName", "preset name");
-        UIFactory.SetLayoutElement(nameInput.GameObject, minWidth: 110, preferredWidth: 150, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(nameInput.GameObject, minWidth: 110, preferredWidth: 150, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         nameInput.OnValueChanged += (string v) => { _beelzPresetName = v ?? ""; };
         AddBeelzSmallButton(row, "BeelzPresetSave", "Save", "Save current bindings as this preset (.beelz preset save).", () => { if (ReqPreset(out var n)) BeelzClient.PresetSave(n); }, 50);
         AddBeelzSmallButton(row, "BeelzPresetLoad", "Load", "Load this preset onto your bar (.beelz preset load).", () => { if (ReqPreset(out var n)) BeelzClient.PresetLoad(n); }, 50);
@@ -2139,7 +2140,7 @@ public partial class MainPanel
             var hdrBtn = UIFactory.CreateButton(_beelzLoadoutAssignContainer, $"BeelzGrpHdr_{key}",
                 $"{(collapsed ? "▶" : "▼")} {key}  ({glist.Count})");
             UIFactory.SetLayoutElement(hdrBtn.GameObject,
-                minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+                minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
             var ht = hdrBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
             if (ht != null) { ht.fontSize = Theme.ScaledUI(12); ht.alignment = TextAlignmentOptions.MidlineLeft; ht.fontStyle = FontStyles.Bold; }
             TooltipHover.Attach(hdrBtn.GameObject, "Click to collapse / expand this group.");
@@ -2327,7 +2328,7 @@ public partial class MainPanel
             (Plugin.UIManager?.IsOverlayOpen(PanelType.BeelzActionBarOverlay) ?? false) ? "Hide Action Bar" : "Show Action Bar");
         UIFactory.SetLayoutElement(overlayBtn.GameObject,
             minWidth: 120, preferredWidth: 150, flexibleWidth: 0,
-            minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var obTxt = overlayBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (obTxt != null) { obTxt.fontSize = Theme.ScaledUI(12); obTxt.alignment = TextAlignmentOptions.Center; }
         TooltipHover.Attach(overlayBtn.GameObject,
@@ -2377,7 +2378,7 @@ public partial class MainPanel
             (Plugin.UIManager?.IsOverlayOpen(PanelType.BeelzSummonsOverlay) ?? false) ? "Hide Summons Overlay" : "Show Summons Overlay");
         UIFactory.SetLayoutElement(summonsOverlayBtn.GameObject,
             minWidth: 140, preferredWidth: 180, flexibleWidth: 0,
-            minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var soTxt = summonsOverlayBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (soTxt != null) { soTxt.fontSize = Theme.ScaledUI(12); soTxt.alignment = TextAlignmentOptions.Center; }
         TooltipHover.Attach(summonsOverlayBtn.GameObject,
@@ -2413,18 +2414,18 @@ public partial class MainPanel
         var nameRow = UIFactory.CreateHorizontalGroup(bindCard, "BeelzHotkeyNameRow",
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 0, 0, 0));
-        UIFactory.SetLayoutElement(nameRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(nameRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var nameInput = UIFactory.CreateInputField(nameRow, "BeelzHotkeyName", "Hotkey name (e.g. Bolt)…");
-        UIFactory.SetLayoutElement(nameInput.GameObject, minWidth: 110, preferredWidth: 150, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(nameInput.GameObject, minWidth: 110, preferredWidth: 150, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         nameInput.OnValueChanged += (string v) => { _beelzHotkeyName = v ?? ""; };
         var bindSearch = UIFactory.CreateInputField(nameRow, "BeelzHotkeyBindSearch", "Search name / unit / weapon / category…");
-        UIFactory.SetLayoutElement(bindSearch.GameObject, minWidth: 110, preferredWidth: 170, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(bindSearch.GameObject, minWidth: 110, preferredWidth: 170, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         bindSearch.OnValueChanged += (string v) => { _beelzHotkeyBindSearch = v ?? ""; RebuildBeelzHotkeyBindList(); };
 
         // Filters (parity with the Loadout assign list): source / category / kind ; group + expand/collapse.
         var hkF1 = UIFactory.CreateHorizontalGroup(bindCard, "BeelzHkFilter1",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 0, 0, 0));
-        UIFactory.SetLayoutElement(hkF1, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(hkF1, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         _beelzHkSourceBtn = AddBeelzSmallButton(hkF1, "BeelzHkSrc", FmtBeelzSource(_beelzHkSource), "Cycle source: All → V-Blood → Regular.",
             () => { _beelzHkSource = _beelzHkSource switch { BeelzAbilSource.All => BeelzAbilSource.VBlood, BeelzAbilSource.VBlood => BeelzAbilSource.Regular, _ => BeelzAbilSource.All };
                     SetBeelzButtonText(_beelzHkSourceBtn, FmtBeelzSource(_beelzHkSource)); RebuildBeelzHotkeyBindList(); }, 110);
@@ -2436,7 +2437,7 @@ public partial class MainPanel
 
         var hkF2 = UIFactory.CreateHorizontalGroup(bindCard, "BeelzHkFilter2",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 0, 0, 0));
-        UIFactory.SetLayoutElement(hkF2, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(hkF2, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         _beelzHkGroupBtn = AddBeelzSmallButton(hkF2, "BeelzHkGroup", FmtBeelzGroup(_beelzHkGroupMode), "Cycle grouping: off → Unit → Category → Kind → Weapon.",
             () => { _beelzHkGroupMode = _beelzHkGroupMode switch { BeelzGroupMode.None => BeelzGroupMode.Unit, BeelzGroupMode.Unit => BeelzGroupMode.Category, BeelzGroupMode.Category => BeelzGroupMode.Kind, BeelzGroupMode.Kind => BeelzGroupMode.Weapon, _ => BeelzGroupMode.None };
                     _beelzHkCollapsed.Clear(); SetBeelzButtonText(_beelzHkGroupBtn, FmtBeelzGroup(_beelzHkGroupMode)); RebuildBeelzHotkeyBindList(); }, 120);
@@ -2601,7 +2602,7 @@ public partial class MainPanel
             g.Sort((a, b) => string.Compare(BeelzNames.Ability(a.AbilityName), BeelzNames.Ability(b.AbilityName), OIC));
             bool collapsed = _beelzHkCollapsed.Contains(key);
             var hdr = UIFactory.CreateButton(_beelzHotkeyBindContainer, $"BeelzHkGrp_{key}", $"{(collapsed ? "▶" : "▼")} {key}  ({g.Count})");
-            UIFactory.SetLayoutElement(hdr.GameObject, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(hdr.GameObject, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
             var ht = hdr.Component.GetComponentInChildren<TextMeshProUGUI>();
             if (ht != null) { ht.fontSize = Theme.ScaledUI(12); ht.alignment = TextAlignmentOptions.MidlineLeft; ht.fontStyle = FontStyles.Bold; }
             TooltipHover.Attach(hdr.GameObject, "Click to collapse / expand this group.");
@@ -2680,7 +2681,7 @@ public partial class MainPanel
         // Toggle the on-screen Transforms overlay (browser-style: double-click a form to transform + phase/revert).
         var tfOverlayBtn = UIFactory.CreateButton(actionRow, "BeelzTformOverlayToggle",
             (Plugin.UIManager?.IsOverlayOpen(PanelType.BeelzTransformOverlay) ?? false) ? "Hide Transforms Overlay" : "Show Transforms Overlay");
-        UIFactory.SetLayoutElement(tfOverlayBtn.GameObject, minWidth: 150, preferredWidth: 190, flexibleWidth: 0, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(tfOverlayBtn.GameObject, minWidth: 150, preferredWidth: 190, flexibleWidth: 0, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var tfOvTxt = tfOverlayBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (tfOvTxt != null) { tfOvTxt.fontSize = Theme.ScaledUI(12); tfOvTxt.alignment = TextAlignmentOptions.Center; }
         TooltipHover.Attach(tfOverlayBtn.GameObject,
@@ -2831,7 +2832,7 @@ public partial class MainPanel
             childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 4, 0, 0));
         AddBeelzRefreshButton(actionRow, "Re-read all settings (api config).", BeelzClient.RequestConfig);
         var search = UIFactory.CreateInputField(actionRow, "BeelzConfigSearch", "Filter settings…");
-        UIFactory.SetLayoutElement(search.GameObject, minWidth: 150, preferredWidth: 220, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(search.GameObject, minWidth: 150, preferredWidth: 220, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         search.OnValueChanged += (string v) => { _beelzAdminConfigSearch = v ?? ""; RebuildBeelzAdminConfig(); };
 
         // Announcements (Beelz v0.88): the enables + message pools are config KEYS in the list below
@@ -2857,9 +2858,9 @@ public partial class MainPanel
             "transform-only take an exact PrefabGUID. Changes persist to ability_rules.json (Reload re-reads it).");
         var fRow1 = UIFactory.CreateHorizontalGroup(filtCard, "BeelzFiltPatRow",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 2, 0, 0));
-        UIFactory.SetLayoutElement(fRow1, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(fRow1, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var patInput = UIFactory.CreateInputField(fRow1, "BeelzFiltPat", "name substring");
-        UIFactory.SetLayoutElement(patInput.GameObject, minWidth: 100, preferredWidth: 140, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(patInput.GameObject, minWidth: 100, preferredWidth: 140, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         patInput.OnValueChanged += (string v) => { _beelzAdminFilterPattern = v ?? ""; };
         AddBeelzSmallButton(fRow1, "BeelzFiltDeny", "Deny+", "Add a deny substring (admin deny).", () => { if (ReqPat(out var p)) AdminSend($".beelz admin deny {p}"); }, 52);
         AddBeelzSmallButton(fRow1, "BeelzFiltUndeny", "Deny−", "Remove a deny substring (admin undeny).", () => { if (ReqPat(out var p)) AdminSend($".beelz admin undeny {p}"); }, 52);
@@ -2867,9 +2868,9 @@ public partial class MainPanel
         AddBeelzSmallButton(fRow1, "BeelzFiltUnallow", "Allow−", "Remove an allow substring (admin unallow).", () => { if (ReqPat(out var p)) AdminSend($".beelz admin unallow {p}"); }, 54);
         var fRow2 = UIFactory.CreateHorizontalGroup(filtCard, "BeelzFiltGuidRow",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 2, 0, 0));
-        UIFactory.SetLayoutElement(fRow2, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(fRow2, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var guidInput = UIFactory.CreateInputField(fRow2, "BeelzFiltGuid", "PrefabGUID");
-        UIFactory.SetLayoutElement(guidInput.GameObject, minWidth: 90, preferredWidth: 120, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(guidInput.GameObject, minWidth: 90, preferredWidth: 120, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         guidInput.OnValueChanged += (string v) => { _beelzAdminFilterGuid = v ?? ""; };
         AddBeelzSmallButton(fRow2, "BeelzFiltDenyGAdd", "DenyGUID+", "Add a deny GUID (admin denyguid add).", () => { if (ReqGuid(out var g)) AdminSend($".beelz admin denyguid add {g}"); }, 72);
         AddBeelzSmallButton(fRow2, "BeelzFiltDenyGRem", "−", "Remove a deny GUID (admin denyguid remove).", () => { if (ReqGuid(out var g)) AdminSend($".beelz admin denyguid remove {g}"); }, 24);
@@ -2961,7 +2962,7 @@ public partial class MainPanel
 
         var ctl = UIFactory.CreateHorizontalGroup(wrap, $"BeelzCfgCtl_{e.Key}",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true, spacing: 8, padding: new Vector4(0, 1, 0, 0));
-        UIFactory.SetLayoutElement(ctl, minWidth: 320, preferredWidth: 380, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(ctl, minWidth: 320, preferredWidth: 380, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
 
         bool isBool = !string.IsNullOrEmpty(e.Type) && e.Type.IndexOf("bool", StringComparison.OrdinalIgnoreCase) >= 0;
         if (isBool)
@@ -2977,14 +2978,14 @@ public partial class MainPanel
             int sel = Math.Max(0, Array.FindIndex(enumOpts, o => string.Equals(o, e.Value, StringComparison.OrdinalIgnoreCase)));
             var ddObj = UIFactory.CreateDropdown(ctl, $"BeelzCfgDD_{e.Key}", out var dd, enumOpts[sel], Theme.ScaledUI(11),
                 i => { if (i >= 0 && i < enumOpts.Length) BeelzClient.SendUser($".beelz admin set {key} {enumOpts[i]}"); }, enumOpts);
-            UIFactory.SetLayoutElement(ddObj, minWidth: 150, preferredWidth: 180, flexibleWidth: 0, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(ddObj, minWidth: 150, preferredWidth: 180, flexibleWidth: 0, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
             BeelzDropdownNoWrap(dd); dd.SetValueWithoutNotify(sel);
             Raphael.UI.Forms.FormDropdownRegistry.Register(dd);
         }
         else
         {
             var input = UIFactory.CreateInputField(ctl, $"BeelzCfgInput_{e.Key}", e.Value); // placeholder shows current value
-            UIFactory.SetLayoutElement(input.GameObject, minWidth: 180, preferredWidth: 300, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(input.GameObject, minWidth: 180, preferredWidth: 300, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
             string typed = e.Value; string current = e.Value;
             input.OnValueChanged += (string v) => typed = v;
             AddBeelzSmallButton(ctl, $"BeelzCfgSet_{e.Key}", "Set",
@@ -3137,7 +3138,7 @@ public partial class MainPanel
         // Row 1: form selector + refresh.
         var selRow = UIFactory.CreateHorizontalGroup(card, "BeelzTformSelRow",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 2, 0, 0));
-        UIFactory.SetLayoutElement(selRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(selRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var formNames = new List<string>();
         var formUnits = new List<string>();
         foreach (var t in transforms)
@@ -3149,7 +3150,7 @@ public partial class MainPanel
         var formDdObj = UIFactory.CreateDropdown(selRow, "BeelzTformForm", out var formDd, formNames[selIdx], Theme.ScaledUI(12),
             i => { if (i >= 0 && i < formUnits.Count) { _beelzTformSelUnit = formUnits[i]; if (!_beelzTformRequested.Contains(_beelzTformSelUnit)) RequestBeelzTform(_beelzTformSelUnit); RebuildBeelzTformKitList(); } },
             formNames.ToArray());
-        UIFactory.SetLayoutElement(formDdObj, minWidth: 150, preferredWidth: 190, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(formDdObj, minWidth: 150, preferredWidth: 190, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         BeelzDropdownNoWrap(formDd); formDd.SetValueWithoutNotify(selIdx);
         Raphael.UI.Forms.FormDropdownRegistry.Register(formDd);
         AddBeelzSmallButton(selRow, "BeelzTformRefresh", "Refresh", "Re-read this form's kit + your current binds from the server.",
@@ -3158,12 +3159,12 @@ public partial class MainPanel
         // Row 2: phase + slot + clear + defaults.
         var psRow = UIFactory.CreateHorizontalGroup(card, "BeelzTformPSRow",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 2, 0, 0));
-        UIFactory.SetLayoutElement(psRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(psRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var phaseOpts = new[] { "Phase 1", "Phase 2" };
         int phaseSel = Math.Clamp(_beelzTformSelPhase - 1, 0, 1);
         var phaseDdObj = UIFactory.CreateDropdown(psRow, "BeelzTformPhase", out var phaseDd, phaseOpts[phaseSel], Theme.ScaledUI(12),
             i => { _beelzTformSelPhase = i + 1; RebuildBeelzTformKitList(); }, phaseOpts);
-        UIFactory.SetLayoutElement(phaseDdObj, minWidth: 90, preferredWidth: 110, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(phaseDdObj, minWidth: 90, preferredWidth: 110, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         BeelzDropdownNoWrap(phaseDd); phaseDd.SetValueWithoutNotify(phaseSel);
         Raphael.UI.Forms.FormDropdownRegistry.Register(phaseDd);
         var slotNames = new List<string>();
@@ -3172,7 +3173,7 @@ public partial class MainPanel
         int slotSel = Math.Max(0, slotVals.IndexOf(_beelzTformSelSlot));
         var slotDdObj = UIFactory.CreateDropdown(psRow, "BeelzTformSlot", out var slotDd, slotNames[slotSel], Theme.ScaledUI(12),
             i => { if (i >= 0 && i < slotVals.Count) _beelzTformSelSlot = slotVals[i]; }, slotNames.ToArray());
-        UIFactory.SetLayoutElement(slotDdObj, minWidth: 120, preferredWidth: 150, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(slotDdObj, minWidth: 120, preferredWidth: 150, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         BeelzDropdownNoWrap(slotDd); slotDd.SetValueWithoutNotify(slotSel);
         Raphael.UI.Forms.FormDropdownRegistry.Register(slotDd);
         AddBeelzSmallButton(psRow, "BeelzTformClear", "Clear slot", "Clear the selected phase+slot back to the curated default (tform <unit> clear <phase> <slot>).",
@@ -3312,7 +3313,7 @@ public partial class MainPanel
                 UIFactory.SetLayoutElement(msgRow, minWidth: 320, preferredWidth: 380, flexibleWidth: 1, minHeight: 24, flexibleHeight: 0);
                 var edit = UIFactory.CreateInputField(msgRow, $"BeelzMsgEdit_{key}_{idxN}", current);
                 edit.Text = current;
-                UIFactory.SetLayoutElement(edit.GameObject, minWidth: 300, preferredWidth: 360, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+                UIFactory.SetLayoutElement(edit.GameObject, minWidth: 300, preferredWidth: 360, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
                 string typed = current;
                 edit.OnValueChanged += (string v) => typed = v;
                 var rowBtns = MakeBeelzRow(msgRow, $"BeelzMsgRowBtns_{key}_{idxN}");
@@ -3335,7 +3336,7 @@ public partial class MainPanel
         // Add a new message.
         var addRow = MakeBeelzRow(wrap, $"BeelzMsgAdd_{key}");
         var addInput = UIFactory.CreateInputField(addRow, $"BeelzMsgAddInput_{key}", "New message…");
-        UIFactory.SetLayoutElement(addInput.GameObject, minWidth: 200, preferredWidth: 300, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(addInput.GameObject, minWidth: 200, preferredWidth: 300, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         string addText = "";
         addInput.OnValueChanged += (string v) => addText = v;
         AddBeelzSmallButton(addRow, $"BeelzMsgAddBtn_{key}", "Add",
@@ -3370,13 +3371,13 @@ public partial class MainPanel
             "Copy a text snapshot of every scanned ability's config (enabled, cooldown/range/charges/… overrides, damage×/cooldown×, notes) to your clipboard. Run Scan all first. Only abilities with a non-baseline setting are listed, plus a header with the totals.",
             CopyBeelzAbilityConfigToClipboard, 180);
         _beelzAbilExportStatus = AddInfoLabel(exportRow, "BeelzAbilExportStatus", "", FontStyles.Italic, Theme.ScaledUI(11));
-        UIFactory.SetLayoutElement(_beelzAbilExportStatus.gameObject, minWidth: 120, preferredWidth: 180, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(_beelzAbilExportStatus.gameObject, minWidth: 120, preferredWidth: 180, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
 
         var filterRow = UIFactory.CreateHorizontalGroup(card, "BeelzAbilTableFilter",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true, spacing: 6, padding: new Vector4(0, 4, 0, 0));
-        UIFactory.SetLayoutElement(filterRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(filterRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var search = UIFactory.CreateInputField(filterRow, "BeelzAbilTableSearch", "Filter by ability name…");
-        UIFactory.SetLayoutElement(search.GameObject, minWidth: 130, preferredWidth: 190, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(search.GameObject, minWidth: 130, preferredWidth: 190, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         search.OnValueChanged += (string v) => { _beelzAbilTableSearch = v ?? ""; _beelzAbilTablePage = 0; RebuildBeelzAbilityTable(); };
         _beelzAbilTableCategoryButton = AddBeelzSmallButton(filterRow, "BeelzAbilTableCat", FormatBeelzAbilTableCategory(),
             "Cycle category filter (from the scanned catalog).",
@@ -3401,7 +3402,7 @@ public partial class MainPanel
         var pageRow = MakeBeelzRow(card, "BeelzAbilTablePageRow");
         AddBeelzSmallButton(pageRow, "BeelzAbilTablePrev", "Prev", "Previous page.", () => { if (_beelzAbilTablePage > 0) { _beelzAbilTablePage--; RebuildBeelzAbilityTable(); } }, 60);
         _beelzAbilTablePageLabel = AddInfoLabel(pageRow, "BeelzAbilTablePageLbl", "", FontStyles.Normal, Theme.ScaledUI(12));
-        UIFactory.SetLayoutElement(_beelzAbilTablePageLabel.gameObject, minWidth: 140, preferredWidth: 200, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(_beelzAbilTablePageLabel.gameObject, minWidth: 140, preferredWidth: 200, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         _beelzAbilTablePageLabel.alignment = TextAlignmentOptions.Center;
         AddBeelzSmallButton(pageRow, "BeelzAbilTableNext", "Next", "Next page.", () => { _beelzAbilTablePage++; RebuildBeelzAbilityTable(); }, 60);
 
@@ -3410,7 +3411,7 @@ public partial class MainPanel
         GameObject HCol(string t, int min, int pref, int flex)
         {
             var l = UIFactory.CreateLabel(hdr, $"BeelzAbilHdr_{t}", $"<color={Theme.MutedBodyHex}><b>{t}</b></color>", TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
-            UIFactory.SetLayoutElement(l.GameObject, minWidth: min, preferredWidth: pref, flexibleWidth: flex, minHeight: 16, preferredHeight: 18, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(l.GameObject, minWidth: min, preferredWidth: pref, flexibleWidth: flex, minHeight: Theme.ScaledHeight(16), preferredHeight: Theme.ScaledHeight(18), flexibleHeight: 0);
             l.TextMesh.enableWordWrapping = false; l.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
             return l.GameObject;
         }
@@ -3561,7 +3562,7 @@ public partial class MainPanel
 
         // Ability (friendly name).
         var nameLbl = UIFactory.CreateLabel(row, "AbilName", BeelzNames.Ability(c.Name), TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
-        UIFactory.SetLayoutElement(nameLbl.GameObject, minWidth: ABILT_NAME_MIN, preferredWidth: ABILT_NAME_PREF, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(nameLbl.GameObject, minWidth: ABILT_NAME_MIN, preferredWidth: ABILT_NAME_PREF, flexibleWidth: 1, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         nameLbl.TextMesh.enableWordWrapping = false; nameLbl.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
 
         // ID — the real numeric PrefabGUID when known: from Beelz `a=` (all abilities) OR from captures
@@ -3570,7 +3571,7 @@ public partial class MainPanel
         string resolvedGuid = BeelzAbilResolvedGuid(c);
         string idText = !string.IsNullOrEmpty(resolvedGuid) ? resolvedGuid : c.Name;
         var idLbl = UIFactory.CreateLabel(row, "AbilId", $"<color=#9FD0FF>{idText}</color>", TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(10));
-        UIFactory.SetLayoutElement(idLbl.GameObject, minWidth: ABILT_ID_MIN, preferredWidth: ABILT_ID_PREF, flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(idLbl.GameObject, minWidth: ABILT_ID_MIN, preferredWidth: ABILT_ID_PREF, flexibleWidth: 0, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         idLbl.TextMesh.enableWordWrapping = false; idLbl.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
 
         // Unit — from the scanned catalog (unit=/unitguid=) when present, else best-effort from captures,
@@ -3578,7 +3579,7 @@ public partial class MainPanel
         string unit = !string.IsNullOrEmpty(c.Unit) ? BeelzUnitName(c.UnitGuid, c.Unit)
                     : _beelzAbilUnitLookup.TryGetValue(c.Name, out var u) ? u : "—";
         var unitLbl = UIFactory.CreateLabel(row, "AbilUnit", $"<color={Theme.MutedBodyHex}>{unit}</color>", TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(10));
-        UIFactory.SetLayoutElement(unitLbl.GameObject, minWidth: ABILT_UNIT_MIN, preferredWidth: ABILT_UNIT_PREF, flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(unitLbl.GameObject, minWidth: ABILT_UNIT_MIN, preferredWidth: ABILT_UNIT_PREF, flexibleWidth: 0, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         unitLbl.TextMesh.enableWordWrapping = false; unitLbl.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
 
         // api25 Review column — status (colored) + audit tag (muted). Gated to align with the header.
@@ -3587,7 +3588,7 @@ public partial class MainPanel
             string rvText = $"<color={BeelzReviewHex(c.ReviewStatus)}>{(string.IsNullOrEmpty(c.ReviewStatus) ? "—" : c.ReviewStatus)}</color>";
             if (!string.IsNullOrEmpty(c.ReviewTag)) rvText += $" <color={Theme.MutedBodyHex}>· {c.ReviewTag}</color>";
             var revLbl = UIFactory.CreateLabel(row, "AbilReview", rvText, TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(10));
-            UIFactory.SetLayoutElement(revLbl.GameObject, minWidth: ABILT_REVIEW_MIN, preferredWidth: ABILT_REVIEW_PREF, flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(revLbl.GameObject, minWidth: ABILT_REVIEW_MIN, preferredWidth: ABILT_REVIEW_PREF, flexibleWidth: 0, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
             revLbl.TextMesh.enableWordWrapping = false; revLbl.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
         }
 
@@ -3600,7 +3601,7 @@ public partial class MainPanel
         var enDd = UIFactory.CreateDropdown(row, "AbilEn", out var dd, origEnabled, Theme.ScaledUI(10),
             i => { string v = i == 0 ? "true" : "false"; BeelzClient.SendUser($".beelz admin ability {name} enabled {v}"); },
             new[] { "true", "false" });
-        UIFactory.SetLayoutElement(enDd, minWidth: ABILT_EN_W, preferredWidth: ABILT_EN_W, flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(enDd, minWidth: ABILT_EN_W, preferredWidth: ABILT_EN_W, flexibleWidth: 0, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         BeelzDropdownNoWrap(dd); dd.SetValueWithoutNotify(c.Enabled ? 0 : 1);
         Raphael.UI.Forms.FormDropdownRegistry.Register(dd);
         TooltipHover.Attach(enDd, BeelzAbilFieldTooltips["enabled"] + " Applies immediately when you change it.");
@@ -3683,7 +3684,7 @@ public partial class MainPanel
             string orig = BeelzAbilFieldValue(c, f.Field);
             var fr = MakeBeelzRow(card, $"AbilSubRow_{c.Name}_{f.Field}");
             var lbl = UIFactory.CreateLabel(fr, $"AbilSubLbl_{f.Field}", $"<color={Theme.MutedBodyHex}>{f.Label}</color>", TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
-            UIFactory.SetLayoutElement(lbl.GameObject, minWidth: 120, preferredWidth: 130, flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(lbl.GameObject, minWidth: 120, preferredWidth: 130, flexibleWidth: 0, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
             lbl.TextMesh.enableWordWrapping = false; lbl.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
             // #7: per-setting tooltip (sourced from Beelzebub's ABILITY_CONFIG.md). Attached to the whole row.
             if (BeelzAbilFieldTooltips.TryGetValue(f.Field, out var tip)) TooltipHover.Attach(fr, $"{f.Label}\n{tip}");
@@ -3695,7 +3696,7 @@ public partial class MainPanel
                 int sel = Math.Max(0, Array.FindIndex(opts, o => o.Equals(orig, OIC)));
                 var ddObj = UIFactory.CreateDropdown(fr, $"AbilSubDd_{f.Field}", out var dd, opts[sel], Theme.ScaledUI(11),
                     i => { if (i >= 0 && i < opts.Length) Mark(field, orig, opts[i]); }, opts);
-                UIFactory.SetLayoutElement(ddObj, minWidth: 90, preferredWidth: 110, flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+                UIFactory.SetLayoutElement(ddObj, minWidth: 90, preferredWidth: 110, flexibleWidth: 0, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
                 BeelzDropdownNoWrap(dd); dd.SetValueWithoutNotify(sel);
                 Raphael.UI.Forms.FormDropdownRegistry.Register(dd);
                 revert.Add(() => { dd.SetValueWithoutNotify(sel); changes.Remove(field); });
@@ -3704,7 +3705,7 @@ public partial class MainPanel
             {
                 var inp = UIFactory.CreateInputField(fr, $"AbilSubIn_{f.Field}", f.Kind == "text" ? "(notes)" : "(baseline)");
                 // Only the free-form notes field is wide; numeric baselines get a small fixed box.
-                UIFactory.SetLayoutElement(inp.GameObject, minWidth: f.Kind == "text" ? 200 : 84, preferredWidth: f.Kind == "text" ? 300 : 96, flexibleWidth: f.Kind == "text" ? 1 : 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+                UIFactory.SetLayoutElement(inp.GameObject, minWidth: f.Kind == "text" ? 200 : 84, preferredWidth: f.Kind == "text" ? 300 : 96, flexibleWidth: f.Kind == "text" ? 1 : 0, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
                 if (!string.IsNullOrEmpty(orig)) inp.Text = orig;
                 inp.OnValueChanged += (string v) => Mark(field, orig, v);
                 revert.Add(() => { inp.Text = orig ?? ""; changes.Remove(field); });
@@ -3716,7 +3717,7 @@ public partial class MainPanel
             string curShown = string.IsNullOrEmpty(orig) ? "—" : orig;
             var nowLbl = UIFactory.CreateLabel(fr, $"AbilSubNow_{f.Field}", $"<color={Theme.MutedBodyHex}>now: {curShown}</color>",
                 TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(10));
-            UIFactory.SetLayoutElement(nowLbl.GameObject, minWidth: 84, preferredWidth: 104, flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(nowLbl.GameObject, minWidth: 84, preferredWidth: 104, flexibleWidth: 0, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
             nowLbl.TextMesh.enableWordWrapping = false; nowLbl.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
             TooltipHover.Attach(nowLbl.GameObject, "The value currently on the server. After you Save, this ability re-scans and this updates to the new value — confirming the change applied.");
         }
@@ -3970,16 +3971,16 @@ public partial class MainPanel
         var shapeRow = UIFactory.CreateHorizontalGroup(shapeCard, "BeelzAdminShapeRow",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true,
             spacing: 6, padding: new Vector4(0, 4, 0, 0));
-        UIFactory.SetLayoutElement(shapeRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(shapeRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         int shapeSel = Math.Max(0, Array.IndexOf(BeelzShapeFields, _beelzAdminShapeField));
         var shapeDdObj = UIFactory.CreateDropdown(shapeRow, "BeelzShapeField", out var shapeDd,
             BeelzShapeFields[shapeSel], Theme.ScaledUI(12),
             i => { if (i >= 0 && i < BeelzShapeFields.Length) _beelzAdminShapeField = BeelzShapeFields[i]; }, BeelzShapeFields);
-        UIFactory.SetLayoutElement(shapeDdObj, minWidth: 130, preferredWidth: 150, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(shapeDdObj, minWidth: 130, preferredWidth: 150, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         BeelzDropdownNoWrap(shapeDd); shapeDd.SetValueWithoutNotify(shapeSel);
         Raphael.UI.Forms.FormDropdownRegistry.Register(shapeDd);
         var shapeVal = UIFactory.CreateInputField(shapeRow, "BeelzShapeVal", "value (or 'clear')");
-        UIFactory.SetLayoutElement(shapeVal.GameObject, minWidth: 96, preferredWidth: 120, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(shapeVal.GameObject, minWidth: 96, preferredWidth: 120, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         shapeVal.OnValueChanged += (string v) => { _beelzAdminShapeValue = v ?? ""; };
         AddBeelzSmallButton(shapeRow, "BeelzShapeSet", "Set",
             "Set the chosen field on the ability (admin ability <id> <field> <value>).",
@@ -4011,19 +4012,19 @@ public partial class MainPanel
         var txCfgRow = UIFactory.CreateHorizontalGroup(txCfgCard, "BeelzAdminTxSetRow",
             forceExpandWidth: true, forceExpandHeight: false, childControlWidth: true, childControlHeight: true,
             spacing: 6, padding: new Vector4(0, 4, 0, 0));
-        UIFactory.SetLayoutElement(txCfgRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(txCfgRow, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         var txUnitInput = UIFactory.CreateInputField(txCfgRow, "BeelzTxUnit", "CHAR_unit name");
-        UIFactory.SetLayoutElement(txUnitInput.GameObject, minWidth: 120, preferredWidth: 150, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(txUnitInput.GameObject, minWidth: 120, preferredWidth: 150, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         txUnitInput.OnValueChanged += (string v) => { _beelzAdminTxUnit = v ?? ""; };
         int txSel = Math.Max(0, Array.IndexOf(BeelzTxSetFields, _beelzAdminTxField));
         var txDdObj = UIFactory.CreateDropdown(txCfgRow, "BeelzTxField", out var txDd,
             BeelzTxSetFields[txSel], Theme.ScaledUI(12),
             i => { if (i >= 0 && i < BeelzTxSetFields.Length) _beelzAdminTxField = BeelzTxSetFields[i]; }, BeelzTxSetFields);
-        UIFactory.SetLayoutElement(txDdObj, minWidth: 120, preferredWidth: 140, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(txDdObj, minWidth: 120, preferredWidth: 140, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         BeelzDropdownNoWrap(txDd); txDd.SetValueWithoutNotify(txSel);
         Raphael.UI.Forms.FormDropdownRegistry.Register(txDd);
         var txValInput = UIFactory.CreateInputField(txCfgRow, "BeelzTxVal", "value");
-        UIFactory.SetLayoutElement(txValInput.GameObject, minWidth: 90, preferredWidth: 110, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(txValInput.GameObject, minWidth: 90, preferredWidth: 110, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         txValInput.OnValueChanged += (string v) => { _beelzAdminTxValue = v ?? ""; };
         AddBeelzSmallButton(txCfgRow, "BeelzTxSetBtn", "Set",
             "Set the chosen field on the transform unit (admin transform-set <unit> <field> <value>).",
@@ -4121,7 +4122,7 @@ public partial class MainPanel
         Func<string, List<(string Display, string Value)>> getMatches, Action<string> onValue)
     {
         var input = UIFactory.CreateInputField(parent, name + "Input", placeholder);
-        UIFactory.SetLayoutElement(input.GameObject, minWidth: 220, preferredWidth: 340, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(input.GameObject, minWidth: 220, preferredWidth: 340, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         if (!string.IsNullOrEmpty(initial)) input.Text = initial;
         var results = UIFactory.CreateVerticalGroup(parent, name + "Results",
             forceWidth: true, forceHeight: false, childControlWidth: true, childControlHeight: true, spacing: 1, padding: new Vector4(10, 1, 2, 3));
@@ -4143,7 +4144,7 @@ public partial class MainPanel
             {
                 var (disp, val) = matches[i];
                 var b = UIFactory.CreateButton(results, $"{name}Res{i}", disp);
-                UIFactory.SetLayoutElement(b.GameObject, minWidth: 220, preferredWidth: 360, flexibleWidth: 1, minHeight: 20, preferredHeight: 22, flexibleHeight: 0);
+                UIFactory.SetLayoutElement(b.GameObject, minWidth: 220, preferredWidth: 360, flexibleWidth: 1, minHeight: Theme.ScaledHeight(20), preferredHeight: Theme.ScaledHeight(22), flexibleHeight: 0);
                 var bt = b.Component.GetComponentInChildren<TextMeshProUGUI>();
                 if (bt != null) { bt.fontSize = Theme.ScaledUI(11); bt.alignment = TextAlignmentOptions.MidlineLeft; bt.enableWordWrapping = false; bt.overflowMode = TextOverflowModes.Ellipsis; }
                 string chosen = val;
@@ -4323,6 +4324,16 @@ public partial class MainPanel
             "Restart Uriel detection from scratch — re-anchors the handshake loop and re-probes (.uriel api version). Use after a server switch if the Uriel group didn't appear.",
             () => { Services.Uriel.UrielProtocolService.Reset(); Services.Uriel.UrielClient.RequestVersion(); RefreshConnectionReadout(); }, 170);
 
+        // --- Faust (0.50) ---
+        var fa = AddCard(page, "ConnFaustCard");
+        AddSectionHeading(fa, "Faust");
+        _connFaustReadout = AddInfoLabel(fa, "ConnFaustState", "", FontStyles.Normal, Theme.ScaledUI(12));
+        _connFaustReadout.overflowMode = TextOverflowModes.Overflow;
+        var faRow = MakeBeelzRow(fa, "ConnFaustRow");
+        AddBeelzPlainButton(faRow, "ConnFaustRedetect", "Re-detect Faust",
+            "Restart Faust detection from scratch — re-anchors the handshake loop and re-probes (.faust api version). Use after a server switch if the Faust group didn't appear. (Most servers don't run Faust.)",
+            () => { Services.Faust.FaustProtocolService.Reset(); Services.Faust.FaustClient.RequestVersion(); RefreshConnectionReadout(); }, 170);
+
         RefreshConnectionReadout();
     }
 
@@ -4366,6 +4377,17 @@ public partial class MainPanel
                 s = "<color=#FFD75A>Detecting…</color> — handshake in progress.";
             _connUrielReadout.text = s;
         }
+        if (_connFaustReadout != null)
+        {
+            string s;
+            if (Services.Faust.FaustState.Present)
+                s = $"<color=#90EE90>Connected</color> — api {Services.Faust.FaustState.ApiVersion}, plugin {Services.Faust.FaustState.PluginVersion}.";
+            else if (Services.Faust.FaustProtocolService.DetectionGaveUp)
+                s = "<color=#FF8080>Not detected</color> — no Faust response on this server (most servers don't run Faust). Re-detect to retry.";
+            else
+                s = "<color=#FFD75A>Detecting…</color> — handshake in progress.";
+            _connFaustReadout.text = s;
+        }
     }
 
     // Small labeled bool toggle row (mirrors the diagnostics toggle) for the Beelz Settings tab.
@@ -4373,11 +4395,11 @@ public partial class MainPanel
     {
         var row = MakeBeelzRow(parent, name + "Row");
         var t = UIFactory.CreateToggle(row, name);
-        UIFactory.SetLayoutElement(t.GameObject, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(t.GameObject, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         t.Text.text = label;
         t.Text.fontSize = Theme.ScaledUI(12);
         t.Text.alignment = TextAlignmentOptions.MidlineLeft;
-        UIFactory.SetLayoutElement(t.Text.gameObject, minWidth: 320, preferredWidth: 360, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(t.Text.gameObject, minWidth: 320, preferredWidth: 360, flexibleWidth: 1, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         t.Toggle.isOn = initial;
         if (!string.IsNullOrEmpty(tooltip)) TooltipHover.Attach(t.GameObject, tooltip);
         t.OnValueChanged += v => { try { onChanged?.Invoke(v); } catch (Exception ex) { LogUtils.LogError($"[Beelz] toggle '{name}' handler threw: {ex}"); } };
@@ -4399,12 +4421,12 @@ public partial class MainPanel
         var diagRow = MakeBeelzRow(diagCard, "BeelzDiagToggleRow");
         var diagToggle = UIFactory.CreateToggle(diagRow, "BeelzDiagnosticsToggle");
         UIFactory.SetLayoutElement(diagToggle.GameObject,
-            minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         diagToggle.Text.text = "Enable diagnostic details (show ability IDs + verbose logging)";
         diagToggle.Text.fontSize = Theme.ScaledUI(12);
         diagToggle.Text.alignment = TextAlignmentOptions.MidlineLeft;
         UIFactory.SetLayoutElement(diagToggle.Text.gameObject,
-            minWidth: 320, preferredWidth: 360, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minWidth: 320, preferredWidth: 360, flexibleWidth: 1, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         diagToggle.Toggle.isOn = Config.Settings.BeelzDiagnostics;
         TooltipHover.Attach(diagToggle.GameObject,
             "ON: ability IDs appear in the Loadout/Hotkeys tables + hover text, and Raphael logs a [Beelz][diag] command/reply " +
@@ -4529,7 +4551,7 @@ public partial class MainPanel
         var row = UIFactory.CreateHorizontalGroup(page, "BeelzAvailGlobalRow",
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true, spacing: 8, padding: new Vector4(2, 2, 2, 2));
-        UIFactory.SetLayoutElement(row, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(row, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         ButtonRef btn = null;
         btn = AddBeelzPlainButton(row, "BeelzAvailGlobalCycle", FormatBeelzAvailability(),
             "Cycle the Beelzebub tab group: Auto → On → Off. Persists to the .cfg; takes effect immediately.",
@@ -4553,7 +4575,7 @@ public partial class MainPanel
     {
         var btn = UIFactory.CreateButton(parent, name, label);
         UIFactory.SetLayoutElement(btn.GameObject,
-            minWidth: width, preferredWidth: width, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+            minWidth: width, preferredWidth: width, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         var t = btn.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (t != null) { t.fontSize = Theme.ScaledUI(12); t.alignment = TextAlignmentOptions.Center; }
         if (!string.IsNullOrEmpty(tooltip)) TooltipHover.Attach(btn.GameObject, tooltip);
@@ -4846,9 +4868,11 @@ public partial class MainPanel
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true,
             spacing: 8, padding: new Vector4(2, 2, 2, 2)); // 8 (was 4): breathing room between fields/buttons across admin rows
+        // 0.50: scale row height with the UI font so buttons/toggles that grow via
+        // Theme.ScaledHeight don't overflow a fixed-height row into the next at Large+ text.
         UIFactory.SetLayoutElement(row,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         return row;
     }
 
@@ -4858,7 +4882,7 @@ public partial class MainPanel
             TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
         UIFactory.SetLayoutElement(lbl.GameObject,
             minWidth: 120, preferredWidth: 180, flexibleWidth: 1,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         lbl.TextMesh.enableWordWrapping = false;
         lbl.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
     }
@@ -4869,7 +4893,7 @@ public partial class MainPanel
             TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
         UIFactory.SetLayoutElement(lbl.GameObject,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         lbl.TextMesh.enableWordWrapping = false;
         lbl.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
         if (italic) lbl.TextMesh.fontStyle = FontStyles.Italic;

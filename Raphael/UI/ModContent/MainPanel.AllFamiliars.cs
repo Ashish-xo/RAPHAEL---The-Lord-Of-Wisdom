@@ -145,7 +145,7 @@ public partial class MainPanel
             spacing: 2, padding: new Vector4(0, 0, 2, 2));
         UIFactory.SetLayoutElement(_allFamRowContainer,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 60, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(60), flexibleHeight: 0);
 
         if (!_allFamSubscribed)
         {
@@ -167,7 +167,7 @@ public partial class MainPanel
             spacing: 4, padding: new Vector4(2, 2, 2, 2));
         UIFactory.SetLayoutElement(headerRow,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 20, preferredHeight: 22, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(20), preferredHeight: Theme.ScaledHeight(22), flexibleHeight: 0);
 
         string ColLabel(string s) => $"<color={Theme.MutedBodyHex}><b>{s}</b></color>";
 
@@ -177,7 +177,7 @@ public partial class MainPanel
                 TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
             UIFactory.SetLayoutElement(lbl.GameObject,
                 minWidth: min, preferredWidth: pref, flexibleWidth: flex,
-                minHeight: 18, preferredHeight: 20, flexibleHeight: 0);
+                minHeight: Theme.ScaledHeight(18), preferredHeight: Theme.ScaledHeight(20), flexibleHeight: 0);
             lbl.TextMesh.enableWordWrapping = false;
             lbl.TextMesh.overflowMode = TextOverflowModes.Overflow;
         }
@@ -362,7 +362,7 @@ public partial class MainPanel
                 TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
             UIFactory.SetLayoutElement(empty.GameObject,
                 minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-                minHeight: 28, preferredHeight: 32, flexibleHeight: 0);
+                minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(32), flexibleHeight: 0);
             empty.TextMesh.fontStyle = FontStyles.Italic;
             return;
         }
@@ -379,14 +379,14 @@ public partial class MainPanel
             spacing: 4, padding: new Vector4(2, 2, 2, 2));
         UIFactory.SetLayoutElement(row,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
 
         // Box · # column
         var boxCol = UIFactory.CreateLabel(row, "Box", $"<color={Theme.MutedBodyHex}>{r.Box}</color> · {r.Index:00}",
             TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
         UIFactory.SetLayoutElement(boxCol.GameObject,
             minWidth: 90, preferredWidth: 110, flexibleWidth: 0,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         boxCol.TextMesh.enableWordWrapping = false;
         boxCol.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
 
@@ -402,7 +402,7 @@ public partial class MainPanel
             TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
         UIFactory.SetLayoutElement(nameCol.GameObject,
             minWidth: 160, preferredWidth: 200, flexibleWidth: 1,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         nameCol.TextMesh.enableWordWrapping = false;
         nameCol.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
 
@@ -411,13 +411,13 @@ public partial class MainPanel
             TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
         UIFactory.SetLayoutElement(lvlCol.GameObject,
             minWidth: 46, preferredWidth: 56, flexibleWidth: 0,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
 
         // Bind button — switches to that box and binds the entry.
         var bindBtn = UIFactory.CreateButton(row, $"AllFamBind_{r.Box}_{r.Index}", "Bind");
         UIFactory.SetLayoutElement(bindBtn.GameObject,
             minWidth: 60, preferredWidth: 80, flexibleWidth: 0,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         var bindTxt = bindBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (bindTxt != null) bindTxt.fontSize = Theme.ScaledUI(11);
         TooltipHover.Attach(bindBtn.GameObject,
@@ -431,7 +431,7 @@ public partial class MainPanel
             new Color(0.55f, 0.18f, 0.18f));
         UIFactory.SetLayoutElement(delBtn.GameObject,
             minWidth: 56, preferredWidth: 72, flexibleWidth: 0,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         var delTxt = delBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (delTxt != null) delTxt.fontSize = Theme.ScaledUI(11);
         TooltipHover.Attach(delBtn.GameObject,

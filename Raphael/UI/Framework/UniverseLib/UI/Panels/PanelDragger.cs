@@ -243,6 +243,12 @@ public class PanelDragger
         return _totalResizeRect.Contains(mousePos);
     }
 
+    /// <summary>Recompute the resize grip masks from the current Rect WITHOUT firing OnFinishResize
+    /// (so it doesn't trigger a config save). For panels that drive their own size programmatically
+    /// — e.g. an auto-height HUD — and need the resize edges to track the new size every frame without
+    /// thrashing the .cfg the way OnEndResize would.</summary>
+    public void RefreshResizeCache() => UpdateResizeCache();
+
     private ResizeTypes GetResizeType(Vector2 mousePos)
     {
         // Calculate which part of the resize area we're in, if any.

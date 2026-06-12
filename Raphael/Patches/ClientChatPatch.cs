@@ -202,6 +202,20 @@ internal static class ClientChatPatch
                     continue;
                 }
 
+                // Faust structured protocol — same pattern as the Beelzebub / Uriel branches above, and
+                // independent of them / of Eclipse. Every [FAUST:*] line (the `.faust api …` investigation
+                // replies) arrives here as a System message; route it to the Faust subcomponent and destroy
+                // the entity so the machine line never surfaces in chat. (Faust's `.faust admin …` replies
+                // are HUMAN text and flow through the normal MessageService pipeline — they are NOT
+                // [FAUST:*], so they fall through this branch untouched.)
+                if (text.StartsWith("[FAUST:", StringComparison.Ordinal))
+                {
+                    try { Services.Faust.FaustProtocolService.HandleLine(text); }
+                    catch (Exception ex) { LogUtils.LogDebug($"Faust HandleLine: {ex.Message}"); }
+                    Plugin.EntityManager.DestroyEntity(entity);
+                    continue;
+                }
+
                 // 0.17.1 EXPERIMENT: in Eclipse stand-down, do NOT decode the
                 // Eclipse protocol (that's the passive layer Eclipse owns) — leave
                 // those entities entirely for Eclipse. Still fall through to the

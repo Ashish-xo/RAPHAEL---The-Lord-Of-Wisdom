@@ -150,6 +150,7 @@ public class ChatWindowOverlayPanel : ResizeablePanelBase
     private Action _composeKeyTicker;
     private Action _tabHotkeyTicker; // 0.17.3: <Modifier>+1..6 tab switch (chat open, not typing)
     private Action _nameClickTicker; // 0.17.3: double-click a name in the log to whisper
+    private Action _scrollKeyTicker; // 0.50 r8: Up/Down/PageUp/PageDown scroll the chat history
     private float _lastNameClickTime;
     private string _lastNameClickId;
     private float _nextComposeRefresh; // 0.17.3: throttle clan-availability re-check (All tab)
@@ -233,6 +234,30 @@ public class ChatWindowOverlayPanel : ResizeablePanelBase
         // Cache the ScrollRect + content rect for auto-scroll-to-newest.
         _scrollRect = scroll.GetComponent<UnityEngine.UI.ScrollRect>();
         _scrollContentRect = scrollContent.GetComponent<RectTransform>();
+
+        // 0.50 r11: clickable scroll arrows pinned to the TOP and BOTTOM of the scrollbar column (right edge).
+        // Each click nudges the view a few lines — the scrollbar handle shrinks to an unusable sliver on a big
+        // buffer. Manual anchors + ignoreLayout so they sit over the scrollbar ends and don't scroll with content.
+        // Added LAST (after the viewport + scrollbar) so they draw on top. Toggle via ChatScrollArrowButtons.
+        if (Config.Settings.ChatScrollArrowButtons)
+        {
+            void AddScrollArrow(string nm, bool up)
+            {
+                var b = UIFactory.CreateButton(scroll, nm, up ? "↑" : "↓");
+                var rt = b.GameObject.GetComponent<RectTransform>();
+                rt.anchorMin = new Vector2(1f, up ? 1f : 0f);
+                rt.anchorMax = new Vector2(1f, up ? 1f : 0f);
+                rt.pivot     = new Vector2(1f, up ? 1f : 0f);
+                rt.sizeDelta = new Vector2(24f, 18f);
+                rt.anchoredPosition = new Vector2(-1f, up ? -1f : 1f);
+                UIFactory.SetLayoutElement(b.GameObject, ignoreLayout: true);
+                if (b.ButtonText != null) { b.ButtonText.fontSize = Theme.ScaledUI(13); b.ButtonText.fontStyle = FontStyles.Bold; }
+                b.OnClick = () => ScrollByStep(up ? +1f : -1f);
+                TooltipHover.Attach(b.GameObject, up ? "Scroll the chat up (older messages)." : "Scroll the chat down (newer messages).");
+            }
+            AddScrollArrow("ChatScrollUpBtn", true);
+            AddScrollArrow("ChatScrollDownBtn", false);
+        }
 
         var lbl = UIFactory.CreateLabel(scrollContent, "ChatLog", string.Empty, TextAlignmentOptions.TopLeft);
         _log = lbl.TextMesh;
@@ -325,6 +350,10 @@ public class ChatWindowOverlayPanel : ResizeablePanelBase
         // unless the feature is on, the window's open, and the click hits a name link.
         _nameClickTicker = TickNameDoubleClick;
         Raphael.Behaviors.CoreUpdateBehavior.Actions.Add(_nameClickTicker);
+        // 0.50 r8: Up/Down (+ PageUp/PageDown) scroll the chat history — the scrollbar
+        // shrinks to an unusable size once the buffer grows. No-ops unless the window's open.
+        _scrollKeyTicker = TickScrollKeys;
+        Raphael.Behaviors.CoreUpdateBehavior.Actions.Add(_scrollKeyTicker);
 
         ApplyChatTextScale(); // size the input field to match the chat scale
         UpdateComposeRow();   // build + show the compose dropdown if All tab is active
@@ -399,6 +428,7 @@ public class ChatWindowOverlayPanel : ResizeablePanelBase
             bool Visible(ChatRelayService.ChatLine ln)
                 => (!filter.HasValue || ln.Channel == filter.Value)
                    && (filter.HasValue || AllTabIncludes(ln.Channel))
+                   && !(!filter.HasValue && Settings.AllTabExcludeNotesToSelf && ChatRelayService.IsNoteToSelf(ln))
                    && (!whisperPartnerFilter || ln.Partner == _activeWhisperPartner);
 
             var sb = new StringBuilder(4096);
@@ -1141,6 +1171,15 @@ public class ChatWindowOverlayPanel : ResizeablePanelBase
         else
         {
             _composeDropdownObj.SetActive(true);
+            // B-fix (0.50 r8): the SEND target (_whisperSendTo) can change via a whisper sub-tab or the
+            // "+ Whisper…" picker WITHOUT the target LIST changing (e.g. re-picking someone who already has a
+            // tab). EnsureComposeTargets returns false in that case, so re-sync the selected index to the
+            // current recipient here — otherwise the "@name" box would keep showing the previous person.
+            if (onWhispers && _whisperSendTo != null)
+            {
+                int wi = _composeTargets.FindIndex(t => t.IsWhisper && string.Equals(t.Whisper, _whisperSendTo, StringComparison.OrdinalIgnoreCase));
+                if (wi >= 0) _composeIndex = wi;
+            }
             _composeDropdown.SetValueWithoutNotify(Mathf.Clamp(_composeIndex, 0, _composeTargets.Count - 1));
         }
     }
@@ -1329,6 +1368,70 @@ public class ChatWindowOverlayPanel : ResizeablePanelBase
         catch { }
     }
 
+    // 0.50 r8/r11: OPT-IN keyboard scrolling for the chat history (the scrollbar becomes a tiny sliver once the
+    // buffer fills). Up = toward older (top), Down = toward newer (bottom). Gated by TWO settings so the keys
+    // can't steal gameplay binds: PageUp/PageDown (ChatScrollPageKeys, default ON) and Up/Down arrows
+    // (ChatScrollArrowKeys, default OFF — they commonly clash with movement). Arrows are also ignored while the
+    // message box is focused unless the pointer is over the log. No-ops when closed or both settings off.
+    private void TickScrollKeys()
+    {
+        try
+        {
+            if (!Enabled || _scrollRect == null) return;
+            bool pageKeys = Config.Settings.ChatScrollPageKeys;
+            bool arrowKeys = Config.Settings.ChatScrollArrowKeys;
+            if (!pageKeys && !arrowKeys) return;
+
+            bool pageUp = pageKeys && UnityEngine.Input.GetKeyDown(KeyCode.PageUp);
+            bool pageDown = pageKeys && UnityEngine.Input.GetKeyDown(KeyCode.PageDown);
+
+            bool arrowsAllowed = false;
+            if (arrowKeys)
+            {
+                // Only steal the arrows from the caret when the pointer is hovering the log area.
+                if (IsInputFocused())
+                {
+                    var lrt = _log != null ? _log.rectTransform : null;
+                    arrowsAllowed = lrt != null &&
+                        UnityEngine.RectTransformUtility.RectangleContainsScreenPoint(lrt, UnityEngine.Input.mousePosition, null);
+                }
+                else arrowsAllowed = true;
+            }
+
+            float dir = 0f;     // +1 = older (up), -1 = newer (down)
+            bool page = false;
+            if (pageUp) { dir = +1f; page = true; }
+            else if (pageDown) { dir = -1f; page = true; }
+            else if (arrowsAllowed)
+            {
+                if (UnityEngine.Input.GetKey(KeyCode.UpArrow)) dir = +1f;
+                else if (UnityEngine.Input.GetKey(KeyCode.DownArrow)) dir = -1f;
+            }
+            if (dir == 0f) return;
+
+            float content = _scrollContentRect != null ? _scrollContentRect.rect.height : 0f;
+            float view = _scrollRect.viewport != null ? _scrollRect.viewport.rect.height : 0f;
+            float scrollable = Mathf.Max(1f, content - view);
+            float deltaPx = page ? Mathf.Max(40f, view * 0.9f) : 700f * UnityEngine.Time.unscaledDeltaTime;
+            float deltaNorm = deltaPx / scrollable;
+            _scrollRect.verticalNormalizedPosition =
+                Mathf.Clamp01(_scrollRect.verticalNormalizedPosition + dir * deltaNorm);
+        }
+        catch { }
+    }
+
+    // 0.50 r11: one click of a scroll-arrow button — nudge the history a few lines. dir +1 = up (older), -1 = down.
+    private void ScrollByStep(float dir)
+    {
+        if (_scrollRect == null) return;
+        float content = _scrollContentRect != null ? _scrollContentRect.rect.height : 0f;
+        float view = _scrollRect.viewport != null ? _scrollRect.viewport.rect.height : 0f;
+        float scrollable = Mathf.Max(1f, content - view);
+        const float stepPx = 52f;   // ~3 lines per click
+        _scrollRect.verticalNormalizedPosition =
+            Mathf.Clamp01(_scrollRect.verticalNormalizedPosition + dir * (stepPx / scrollable));
+    }
+
     // Resolve a double-clicked name to a whisper target and open the conversation (All
     // tab, that whisper selected as the compose target, input focused). If the name
     // can't be resolved (e.g. they're offline now), report who IS whisperable.
@@ -1381,6 +1484,7 @@ public class ChatWindowOverlayPanel : ResizeablePanelBase
         bool Visible(ChatRelayService.ChatLine ln)
             => (!filter.HasValue || ln.Channel == filter.Value)
                && (filter.HasValue || AllTabIncludes(ln.Channel))
+               && !(!filter.HasValue && Settings.AllTabExcludeNotesToSelf && ChatRelayService.IsNoteToSelf(ln))
                && (!whisperPartnerFilter || ln.Partner == _activeWhisperPartner);
         // 0.17.3: pre-compute tabular column geometry once per render. Fixed-pixel
         // columns (auto-fit) give all extra width to the message column; otherwise the
@@ -1776,6 +1880,11 @@ public class ChatWindowOverlayPanel : ResizeablePanelBase
         {
             Raphael.Behaviors.CoreUpdateBehavior.Actions.Remove(_nameClickTicker);
             _nameClickTicker = null;
+        }
+        if (_scrollKeyTicker != null)
+        {
+            Raphael.Behaviors.CoreUpdateBehavior.Actions.Remove(_scrollKeyTicker);
+            _scrollKeyTicker = null;
         }
         _composeDropdownObj = null;
         _composeDropdown = null;

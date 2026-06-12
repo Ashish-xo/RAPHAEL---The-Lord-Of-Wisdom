@@ -128,6 +128,7 @@ public static class InitializationPatch
             EclipseProtocolService.Reset();  // clear registration so we re-register on relog
             Services.Beelzebub.BeelzProtocolService.Reset(); // clear Beelz detection (DetectionGaveUp) + state so a server-switch re-detects
             Services.Uriel.UrielProtocolService.Reset(); // 0.26: same, for Uriel — re-detect on relog/server-switch
+            Services.Faust.FaustProtocolService.Reset(); // same, for Faust — re-detect + drop query state on relog/server-switch
             Services.Uriel.UrielBuildMode.Reset(); // 0.26: build-mode hotkeys always start OFF on a new session
             Services.ChatRelayService.Clear(); // 0.18.3: drop the previous server's chat scrollback/compose state (PURE static-collection clear — safe in teardown; the chat WINDOW is repainted on relog via ResetForServerSwitch)
             // 0.18.4 CRASH FIX (server-switch): drop cached ECS EntityQueries created in THIS (now-disposing)
@@ -138,6 +139,8 @@ public static class InitializationPatch
             TypingInputLock.OnWorldTeardown();   // 0.25.0: drop the input-context refs (the dying world's InputActionSystem takes the registration with it)
             Services.PlayerRosterService.OnWorldTeardown();
             Services.Uriel.SharedContainerDetector.OnWorldTeardown(); // 0.26: drop the shared-container query for the new world
+            Services.Faust.[redacted].OnWorldTeardown(); // drop the [redacted] queries for the new world
+            UI.ModContent.[redacted].OnWorldTeardown(); // drop the [redacted] container for the new world
             Core.Reset();                    // release Core's client world
             Plugin.ResetGameData();          // null Plugin._client (IsClientNull()=true) + allow re-bind on relog
             // 0.18.1: queue the UI hide so overlays/launcher don't linger over the main menu. PURE

@@ -147,6 +147,7 @@ public class Settings
     public static float BeelzSummonsOverlayTransparency => GetFloat(nameof(BeelzSummonsOverlayTransparency), UITransparency);
     public static float BeelzTransformOverlayTransparency => GetFloat(nameof(BeelzTransformOverlayTransparency), UITransparency);
     public static float UrielSharedOverlayTransparency => GetFloat(nameof(UrielSharedOverlayTransparency), UITransparency);
+    public static float [redacted]Transparency => GetFloat(nameof([redacted]Transparency), UITransparency);
     public static float UrielObjectSpawnerOverlayTransparency => GetFloat(nameof(UrielObjectSpawnerOverlayTransparency), UITransparency);
     public static float ChatWindowOverlayTransparency => GetFloat(nameof(ChatWindowOverlayTransparency), UITransparency);
     public static float DailyQuestTransparency       => GetFloat(nameof(DailyQuestTransparency),       UITransparency);
@@ -160,6 +161,7 @@ public class Settings
     public static void SetBeelzSummonsOverlayTransparency(float v) => SetFloat(nameof(BeelzSummonsOverlayTransparency), v);
     public static void SetBeelzTransformOverlayTransparency(float v) => SetFloat(nameof(BeelzTransformOverlayTransparency), v);
     public static void SetUrielSharedOverlayTransparency(float v) => SetFloat(nameof(UrielSharedOverlayTransparency), v);
+    public static void Set[redacted]Transparency(float v) => SetFloat(nameof([redacted]Transparency), v);
     public static void SetUrielObjectSpawnerOverlayTransparency(float v) => SetFloat(nameof(UrielObjectSpawnerOverlayTransparency), v);
     public static void SetChatWindowOverlayTransparency(float v) => SetFloat(nameof(ChatWindowOverlayTransparency), v);
     public static void SetDailyQuestTransparency(float v)       => SetFloat(nameof(DailyQuestTransparency), v);
@@ -705,6 +707,10 @@ public class Settings
     public static bool ShowBeelzTransformOverlay => (ConfigEntries[nameof(ShowBeelzTransformOverlay)] as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowUrielSharedOverlay => (ConfigEntries[nameof(ShowUrielSharedOverlay)] as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowUrielObjectSpawnerOverlay => (ConfigEntries[nameof(ShowUrielObjectSpawnerOverlay)] as ConfigEntry<bool>)?.Value ?? false;
+    public static bool Show[redacted] => (ConfigEntries[nameof(Show[redacted])] as ConfigEntry<bool>)?.Value ?? false;
+    // Faust [redacted]s: a floating label drawn over each [redacted]'s world position
+    // (projected to screen each frame). Persisted so it restores across logins like the other overlays.
+    public static bool [redacted] => (ConfigEntries[nameof([redacted])] as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowChatWindowOverlay => (ConfigEntries[nameof(ShowChatWindowOverlay)] as ConfigEntry<bool>)?.Value ?? false;
     public static bool ChatShowTimestamps => (ConfigEntries[nameof(ChatShowTimestamps)] as ConfigEntry<bool>)?.Value ?? true;
     public static bool ChatShowChannelTags => (ConfigEntries[nameof(ChatShowChannelTags)] as ConfigEntry<bool>)?.Value ?? true;
@@ -727,6 +733,16 @@ public class Settings
     // 0.17.0: auto-scroll the chat log to keep the newest message in view as lines arrive.
     public static bool ChatAutoScroll => (ConfigEntries[nameof(ChatAutoScroll)] as ConfigEntry<bool>)?.Value ?? true;
     public static void SetChatAutoScroll(bool v) => SetBool(nameof(ChatAutoScroll), v);
+
+    // Chat scrolling aids (0.50 r11). Clickable ▲/▼ arrows on the scrollbar (default ON). Keyboard scrolling is
+    // OPT-IN so it can't steal gameplay keys: PageUp/PageDown (default ON — rarely bound) and Up/Down arrows
+    // (default OFF — commonly used in gameplay) are separate toggles.
+    public static bool ChatScrollArrowButtons => (ConfigEntries[nameof(ChatScrollArrowButtons)] as ConfigEntry<bool>)?.Value ?? true;
+    public static void SetChatScrollArrowButtons(bool v) => SetBool(nameof(ChatScrollArrowButtons), v);
+    public static bool ChatScrollPageKeys => (ConfigEntries[nameof(ChatScrollPageKeys)] as ConfigEntry<bool>)?.Value ?? true;
+    public static void SetChatScrollPageKeys(bool v) => SetBool(nameof(ChatScrollPageKeys), v);
+    public static bool ChatScrollArrowKeys => (ConfigEntries[nameof(ChatScrollArrowKeys)] as ConfigEntry<bool>)?.Value ?? false;
+    public static void SetChatScrollArrowKeys(bool v) => SetBool(nameof(ChatScrollArrowKeys), v);
     // 0.17.0: channel label format — short acronym ([G]/[L]/[Sys]/[W], false/default)
     // or the spelled-out name ([Global]/[Local]/[System]/[Whisper], true).
     public static bool ChatChannelLabelsSpelledOut => (ConfigEntries[nameof(ChatChannelLabelsSpelledOut)] as ConfigEntry<bool>)?.Value ?? false;
@@ -795,6 +811,11 @@ public class Settings
     public static void SetAllTabShowSystem(bool v)  => SetBool(nameof(AllTabShowSystem), v);
     public static bool AllTabShowWhisper => (ConfigEntries[nameof(AllTabShowWhisper)] as ConfigEntry<bool>)?.Value ?? true;
     public static void SetAllTabShowWhisper(bool v) => SetBool(nameof(AllTabShowWhisper), v);
+    // Hide NOTES TO SELF (whispers to your own character) from the main chat's 'All' tab — for players who
+    // route their self-notes to the secondary view-only window instead (see SecondaryChatShowNotesToSelf).
+    // The Whispers tab still shows them; only the consolidated All view hides them.
+    public static bool AllTabExcludeNotesToSelf => (ConfigEntries[nameof(AllTabExcludeNotesToSelf)] as ConfigEntry<bool>)?.Value ?? false;
+    public static void SetAllTabExcludeNotesToSelf(bool v) => SetBool(nameof(AllTabExcludeNotesToSelf), v);
 
     // 0.24: a SECOND, VIEW-ONLY chat window (SecondaryChatOverlayPanel) that mirrors a chosen subset of
     // channels — for watching two streams at once. ShowSecondaryChatOverlay = was it open at last logout;
@@ -811,6 +832,10 @@ public class Settings
     public static void SetSecondaryChatShowSystem(bool v)  => SetBool(nameof(SecondaryChatShowSystem), v);
     public static bool SecondaryChatShowWhisper => (ConfigEntries[nameof(SecondaryChatShowWhisper)] as ConfigEntry<bool>)?.Value ?? false;
     public static void SetSecondaryChatShowWhisper(bool v) => SetBool(nameof(SecondaryChatShowWhisper), v);
+    // Show ONLY notes-to-self (whispers to your own character) — independent of the Whisper toggle, so the
+    // secondary window can mirror a running scratchpad of self-notes without all the whisper traffic.
+    public static bool SecondaryChatShowNotesToSelf => (ConfigEntries[nameof(SecondaryChatShowNotesToSelf)] as ConfigEntry<bool>)?.Value ?? false;
+    public static void SetSecondaryChatShowNotesToSelf(bool v) => SetBool(nameof(SecondaryChatShowNotesToSelf), v);
     // 0.17.3: switch chat tabs with <Modifier>+1..6 while the chat window is open and
     // you're NOT typing in it. Modifier is Shift / Ctrl / Alt / None. Tab order:
     // 1=All, 2=Global, 3=Local, 4=Clan, 5=System, 6=Whispers.
@@ -965,6 +990,38 @@ public class Settings
     public static void SetShowBeelzSummonsOverlay(bool v) => SetBool(nameof(ShowBeelzSummonsOverlay), v);
     public static void SetShowBeelzTransformOverlay(bool v) => SetBool(nameof(ShowBeelzTransformOverlay), v);
     public static void SetShowUrielSharedOverlay(bool v) => SetBool(nameof(ShowUrielSharedOverlay), v);
+    public static void SetShow[redacted](bool v) => SetBool(nameof(Show[redacted]), v);
+    public static void Set[redacted](bool v) => SetBool(nameof([redacted]), v);
+    // Bitmask of ObjCategory flags the [redacted] / [redacted] will show (default 0x3FF = resources +
+    // containers + prisons, Castle off). Edited via the per-category toggles in Faust → [redacted].
+    public static int [redacted] => (ConfigEntries[nameof([redacted])] as ConfigEntry<int>)?.Value ?? 0x3FF;
+    public static void Set[redacted](int v) => SetInt(nameof([redacted]), v);
+    // How far (metres) the [redacted] reach. Default 25; raise it to tag objects further from the player.
+    public static int [redacted] => UnityEngine.Mathf.Clamp((ConfigEntries[nameof([redacted])] as ConfigEntry<int>)?.Value ?? 25, 5, 80);
+    public static void Set[redacted](int v) => SetInt(nameof([redacted]), UnityEngine.Mathf.Clamp(v, 5, 80));
+    // Faust bar charts: stretch to fill the panel width (true, default = dynamic) vs a compact, left-anchored
+    // static width (false). Set via Faust → Settings.
+    public static bool FaustChartStretch => (ConfigEntries[nameof(FaustChartStretch)] as ConfigEntry<bool>)?.Value ?? true;
+    public static void SetFaustChartStretch(bool v) => SetBool(nameof(FaustChartStretch), v);
+    // Color theme for Faust bar charts / graphs: 0=Green, 1=Teal, 2=Blue, 3=Red, 4=Amber, 5=Violet.
+    public static int FaustChartColor => UnityEngine.Mathf.Clamp((ConfigEntries[nameof(FaustChartColor)] as ConfigEntry<int>)?.Value ?? 0, 0, 5);
+    public static void SetFaustChartColor(int v) => SetInt(nameof(FaustChartColor), UnityEngine.Mathf.Clamp(v, 0, 5));
+    // Heat-map intensity gradient (low→high): 0=Theme color (black→chart color), 1=Heat (black→red→yellow→white),
+    // 2=Green (black→green→white), 3=Mono (black→white). A true cold→hot ramp reads far better than one flat hue.
+    public static int FaustHeatGradient => UnityEngine.Mathf.Clamp((ConfigEntries[nameof(FaustHeatGradient)] as ConfigEntry<int>)?.Value ?? 1, 0, 3);
+    public static void SetFaustHeatGradient(int v) => SetInt(nameof(FaustHeatGradient), UnityEngine.Mathf.Clamp(v, 0, 3));
+    // Heat-map render detail: 0=Native (Faust's finest cell), 1=Grouped 2×, 2=Grouped 4×. Coarsening merges
+    // N×N cells client-side to smooth sparse data into blobs. Cannot go FINER than Faust's [Faust.Heatmap] CellSize.
+    public static int FaustHeatDetail => UnityEngine.Mathf.Clamp((ConfigEntries[nameof(FaustHeatDetail)] as ConfigEntry<int>)?.Value ?? 0, 0, 2);
+    public static void SetFaustHeatDetail(int v) => SetInt(nameof(FaustHeatDetail), UnityEngine.Mathf.Clamp(v, 0, 2));
+    // Heat-map board extent: 0=Map (draw to the full buildable-map bounds when Faust sends them — true scale, sparse
+    // data = a few dots on the real outline), 1=Zoom (size to just the occupied cells). Falls back to Zoom if Faust
+    // doesn't send mapbounds (api <17).
+    public static int FaustHeatScale => UnityEngine.Mathf.Clamp((ConfigEntries[nameof(FaustHeatScale)] as ConfigEntry<int>)?.Value ?? 0, 0, 1);
+    public static void SetFaustHeatScale(int v) => SetInt(nameof(FaustHeatScale), UnityEngine.Mathf.Clamp(v, 0, 1));
+    // Per-query-type cooldown (seconds) on Faust server reads — stops spam-clicking Refresh from hammering
+    // the server (important with many simultaneous players). 0 disables. Default 5.
+    public static int FaustQueryCooldownSeconds => (ConfigEntries[nameof(FaustQueryCooldownSeconds)] as ConfigEntry<int>)?.Value ?? 5;
     public static void SetShowUrielObjectSpawnerOverlay(bool v) => SetBool(nameof(ShowUrielObjectSpawnerOverlay), v);
     public static void SetShowChatWindowOverlay(bool v) => SetBool(nameof(ShowChatWindowOverlay), v);
     public static void SetChatShowTimestamps(bool v) => SetBool(nameof(ChatShowTimestamps), v);
@@ -997,6 +1054,13 @@ public class Settings
     // Settings flag handles writes (Set* methods + SetBool helper).
     public static void SetIsPanelAutoResizeEnabled(bool v) => SetBool(nameof(IsPanelAutoResizeEnabled), v);
 
+    // Left-rail accordion: opening one tab group (Bloodcraft / Beelzebub / Kindred / Uriel / Faust /
+    // Settings & Help) auto-collapses the others, so the rail stays short on small screens. Default ON;
+    // turn it off to keep multiple groups expanded at once.
+    public static bool LeftRailAccordion =>
+        (ConfigEntries[nameof(LeftRailAccordion)] as ConfigEntry<bool>)?.Value ?? true;
+    public static void SetLeftRailAccordion(bool v) => SetBool(nameof(LeftRailAccordion), v);
+
     // (SuspendGameInputWhileTyping was removed in 0.8.2 — its Harmony prefix on
     // InputActionSystem.OnUpdate also wedged Unity's UI input pipeline,
     // locking the entire game when users typed into a form. A proper fix needs
@@ -1026,10 +1090,14 @@ public class Settings
     // 0.26: Uriel is a still-in-development sibling server mod most servers lack.
     // Auto = present iff the `.uriel api version` handshake ACKs ready=1.
     public static ModAvailability UrielAvailability      => ReadAvailability(nameof(UrielAvailability));
+    // Faust is a still-in-development sibling server mod (investigation/information) most servers lack.
+    // Auto = present iff the `.faust api version` handshake ACKs ready=1.
+    public static ModAvailability FaustAvailability      => ReadAvailability(nameof(FaustAvailability));
     public static void SetBloodcraftAvailability(ModAvailability v) => SetAvailability(nameof(BloodcraftAvailability), v);
     public static void SetKindredAvailability(ModAvailability v)    => SetAvailability(nameof(KindredAvailability), v);
     public static void SetBeelzebubAvailability(ModAvailability v)  => SetAvailability(nameof(BeelzebubAvailability), v);
     public static void SetUrielAvailability(ModAvailability v)      => SetAvailability(nameof(UrielAvailability), v);
+    public static void SetFaustAvailability(ModAvailability v)      => SetAvailability(nameof(FaustAvailability), v);
 
     // 0.18: Beelzebub diagnostic detail (default off). When ON: the loadout tables show
     // each ability's ID (PrefabGUID) + raw prefab name, and Raphael writes a verbose wire
@@ -1045,6 +1113,19 @@ public class Settings
     // tab; also implied while the global DiagnosticMode is active (see UrielDiag).
     public static bool UrielDiagnostics => (ConfigEntries.TryGetValue(nameof(UrielDiagnostics), out var eu) && eu is ConfigEntry<bool> bu) && bu.Value;
     public static void SetUrielDiagnostics(bool v) => SetBool(nameof(UrielDiagnostics), v);
+
+    // Faust diagnostic detail (default off). When ON, Raphael writes a verbose [Faust][diag] wire trace
+    // (commands sent + raw [FAUST:*] replies) to the BepInEx LogOutput.log so testers/admins can report
+    // exactly which Faust queries fired and what came back. Toggled from the Faust → Settings tab; also
+    // implied while the global DiagnosticMode is active (see FaustDiag).
+    public static bool FaustDiagnostics => (ConfigEntries.TryGetValue(nameof(FaustDiagnostics), out var ef) && ef is ConfigEntry<bool> bf) && bf.Value;
+    public static void SetFaustDiagnostics(bool v) => SetBool(nameof(FaustDiagnostics), v);
+
+    // Faust decay/duration display granularity (Castle Info + All Plots decay timers). 0=Auto (the two
+    // largest non-zero units, so a weeks-long timer never renders as a huge hour count), 1=Hours+minutes
+    // (legacy), 2=Days/hours/minutes, 3=Weeks/days/hours/minutes. Cycled from the Faust → Settings tab.
+    public static int FaustDurationStyle => (ConfigEntries[nameof(FaustDurationStyle)] as ConfigEntry<int>)?.Value ?? 0;
+    public static void SetFaustDurationStyle(int v) => SetInt(nameof(FaustDurationStyle), v);
 
     // 0.19: after a Raphael grant/unslot, auto-send `.beelz refresh` so the in-game action bar reflects the
     // new ability immediately (the server's own refresh doesn't always show it). Default ON.
@@ -1307,6 +1388,16 @@ public class Settings
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowBeelzActionBarOverlay),   false, "Whether the Beelz Action Bar overlay (on-screen buttons + cooldown rings for Beelzebub hotkey abilities beyond the 6 spell slots) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowBeelzSummonsOverlay),     false, "Whether the Beelz Summons overlay (one-click stash/restore + recall/clear for your Beelzebub summons) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowUrielSharedOverlay),       false, "Whether the Uriel \"Nearby Public Storage\" overlay (client-side list of Uriel-shared containers/cells around you) was visible at last logout.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(Show[redacted]),          false, "Whether the Faust \"[redacted]\" overlay (client-side HUD showing what your cursor is over + a [redacted]s list) was visible at last logout.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof([redacted]),          false, "Whether the Faust [redacted]s (a floating name drawn over each [redacted]'s position) were visible at last logout. Restored automatically on UI bring-up.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustQueryCooldownSeconds),      5,     "Minimum seconds between repeat Faust server queries of the same kind (anti-spam — a fast double-click or held click won't fire a second request until this elapses). Protects the server when many players query at once. 0 disables. Default 5.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof([redacted]),         0x3FF,"Bitmask of object categories shown by the Faust [redacted] / [redacted] (Ore=1, Wood=2, Grass=4, Plant=8, Flower=16, Grave=32, Tech=64, OtherResource=128, Container=256, Prison=512, Other=1024, Castle=2048; default 1023 = all resources + containers + prisons, Castle off). Edited via the per-category toggles in Faust → [redacted].");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof([redacted]),               25,    "How far (metres, 5–80) the Faust [redacted] reach. Default 25; raise it to tag objects further from the player (they only label if within this distance AND on-screen). Set via Faust → [redacted].");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustChartStretch),              true,  "Faust bar charts: ON = stretch the bars to fill the panel width (dynamic); OFF = a compact, left-anchored static width. Changes apply when the chart re-renders (switch view or Refresh). Set via Faust → Settings.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustChartColor),                0,     "Color theme for Faust bar charts / graphs: 0=Green, 1=Teal, 2=Blue, 3=Red, 4=Amber, 5=Violet. Applies when a chart re-renders. Set via Faust → Settings → Charts.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustHeatGradient),              1,     "Faust heat-map color ramp (low→high traffic): 0=Theme (black→chart color), 1=Heat (black→red→yellow→white), 2=Green (black→green→white), 3=Mono (black→white). Set via Faust → Settings → Heat map.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustHeatDetail),                0,     "Faust heat-map render detail: 0=Native (Faust's finest cell), 1=Grouped 2×, 2=Grouped 4×. Higher = merge cells into bigger blobs (smooths sparse data); cannot exceed Faust's own CellSize resolution. Set via Faust → Settings → Heat map.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustHeatScale),                 0,     "Faust heat-map board extent: 0=Map (draw to the full buildable-map bounds — true scale, needs Faust api 17+), 1=Zoom (size to just the occupied cells). Set via Faust → Settings → Heat map.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowUrielObjectSpawnerOverlay), false, "Whether the Uriel object-spawn palette overlay (quick-build list of your unlocked objects with per-row Spawn buttons) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowBeelzTransformOverlay),   false, "Whether the Beelz Transforms overlay (double-click a form to transform; phase/revert controls) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowChatWindowOverlay),       false, "Whether the standalone tabbed chat window (Game UI) was visible at last logout.");
@@ -1317,6 +1408,9 @@ public class Settings
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatTextScale),               1.0f,  "Font size multiplier for the tabbed chat window ONLY — independent of 'Overlay text size'. (Small=0.85, Standard=1.0, Large=1.2, X-Large=1.5.) Lets you enlarge chat text without enlarging the XP / Familiar / etc. overlays. Changes apply immediately.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatNewestAtBottom),          true,  "Tabbed chat: show the newest message at the BOTTOM (true, like the game's own chat) or at the TOP (false).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatAutoScroll),              true,  "Tabbed chat: automatically scroll to keep the newest message in view as new lines arrive (to the bottom or top per the 'newest at bottom' setting). Turn off to scroll back through history freely without being snapped to the newest line.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatScrollArrowButtons),      true,  "Tabbed chat: show clickable ▲/▼ scroll arrows at the top and bottom of the chat scrollbar. Each click nudges the history up/down a few lines — handy when the scrollbar gets tiny on a big buffer. Default on. Set via Game UI → chat → Scrolling.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatScrollPageKeys),          true,  "Tabbed chat: let PageUp / PageDown scroll the chat history (a page at a time) while the chat window is open. Default on (these keys rarely clash with gameplay). Set via Game UI → chat → Scrolling.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatScrollArrowKeys),         false, "Tabbed chat: let the Up / Down arrow keys scroll the chat history while the chat window is open. Default OFF because the arrow keys are commonly used for gameplay — turn on only if you don't bind them in-game. Set via Game UI → chat → Scrolling.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatChannelLabelsSpelledOut), false, "Tabbed chat: spell out channel labels in full ([Global] / [Local] / [Clan] / [System] / [Whisper]) instead of the short acronyms ([G] / [L] / [Clan] / [Sys] / [W]). Only applies when 'Show channel labels' is on.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatColorTabs),                true,  "Tabbed chat: tint each channel tab's label in that channel's color (Global / Local / Clan / System / Whispers). The All tab stays neutral. Off = all tab labels use the default text color.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatTabularLayout),             false, "Tabbed chat: render messages in aligned COLUMNS (time | channel + sender | message) with wrapped lines hanging-indented under the message column — cleaner for the mixed All tab. Off by default (free-flowing text). Best with timestamps + channel labels on.");
@@ -1341,12 +1435,14 @@ public class Settings
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(AllTabShowClan),               true,  "Tabbed chat: include CLAN messages in the 'All' tab. Uncheck to hide Clan from All (its own Clan tab is unaffected).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(AllTabShowSystem),             true,  "Tabbed chat: include SYSTEM messages in the 'All' tab. Uncheck to hide system/server messages from All (its own System tab is unaffected).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(AllTabShowWhisper),            true,  "Tabbed chat: include WHISPERS in the 'All' tab. Uncheck to hide whispers from All (the Whispers tab is unaffected).");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(AllTabExcludeNotesToSelf),     false, "Tabbed chat: hide NOTES TO SELF (whispers to your own character) from the 'All' tab — for players who route self-notes to the secondary window. The Whispers tab still shows them.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowSecondaryChatOverlay),     false, "Whether the secondary VIEW-ONLY chat window was open at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(SecondaryChatShowGlobal),       false, "Secondary chat window: show GLOBAL messages.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(SecondaryChatShowLocal),        false, "Secondary chat window: show LOCAL messages.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(SecondaryChatShowClan),         true,  "Secondary chat window: show CLAN messages. Default ON.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(SecondaryChatShowSystem),       true,  "Secondary chat window: show SYSTEM / server messages. Default ON.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(SecondaryChatShowWhisper),      false, "Secondary chat window: show WHISPERS.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(SecondaryChatShowNotesToSelf),  false, "Secondary chat window: show NOTES TO SELF (whispers to your own character) — independent of the Whisper toggle.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatTabHotkeysEnabled),        true,  "Tabbed chat: switch tabs with hotkeys (a modifier + number 1-6) while the chat window is open and you are NOT typing in it. Tab order: 1=All, 2=Global, 3=Local, 4=Clan, 5=System, 6=Whispers.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatTabHotkeyModifier),        "Alt",   "Tabbed chat: modifier held with number keys 1-6 to switch tabs. One of: Shift, Ctrl, Alt, None. Default Alt (so Alt+1..6) — Shift+number is the game's consumable bar and Ctrl pops the action wheel, so Alt is the safest free default. Change it here if Alt also conflicts for you.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShiftSpellOverlayShowDiagnostics), false, "Show the small italic 'pf/cg/si/end/srv' debug line under the Shift overlay's SHIFT label. Off by default; flip on if you need to debug why the cooldown isn't updating.");
@@ -1358,6 +1454,7 @@ public class Settings
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(BlockInputWhenPointerOverUI),         false, "Don't fire your primary attack / spell cast when you LEFT-CLICK while the cursor is over any Raphael panel or overlay (the chat window is always covered regardless). Stops a click on a button/overlay from leaking into the world as an attack or a stuck cast. Default OFF — leave off if you want to keep casting with the cursor parked over an overlay. Only suppresses the attack/cast (never movement, never menus), so it can't freeze the game.");
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(SuppressConsoleKeybindsWhileTyping),  true,  "ADMINS: stop console keybindings (hotkeys assigned with the console's 'keybinding create' command) from firing while you type in a Raphael field or have the main panel open (panel case requires SuppressGameInputWhileUIOpen). The game reads these binds outside its normal input pipeline, so even the native chat's typing lock can't block them — Raphael disables them the same way the game's own UI text fields do, and the game automatically re-enables them the moment you stop typing. Default ON; harmless for non-admins (the binds only execute on console-enabled sessions).");
         InitConfigEntry(UI_SETTINGS_GROUP,      nameof(IsPanelAutoResizeEnabled),    true,  "Auto-resize the main panel vertically to fit the active tab's content (capped at 90% of screen height).");
+        InitConfigEntry(UI_SETTINGS_GROUP,      nameof(LeftRailAccordion),           true,  "Left-rail accordion: opening one tab group (Bloodcraft / Beelzebub / Kindred / Uriel / Faust / Settings & Help) collapses the others, keeping the rail short on small screens. Default ON; turn off to keep multiple groups expanded at once.");
         InitConfigEntry(UI_SETTINGS_GROUP,      nameof(UITextScale),                 1.0f,  "Font scale multiplier for the main panel (Small=0.85, Standard=1.0, Large=1.2, X-Large=1.5). Changes apply when the panel is closed and reopened.");
         InitConfigEntry(UI_SETTINGS_GROUP,      nameof(OverlayTextScale),            1.0f,  "Font scale multiplier for the secondary overlays (Small=0.85, Standard=1.0, Large=1.2, X-Large=1.5). Changes apply when each overlay is toggled off and back on.");
 
@@ -1374,6 +1471,7 @@ public class Settings
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(BeelzActionBarOverlayTransparency), 0.4f, "Beelz Action Bar overlay background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(BeelzSummonsOverlayTransparency), 0.4f, "Beelz Summons overlay background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(UrielSharedOverlayTransparency), 0.4f, "Uriel Nearby Public Storage overlay background transparency (0.0=solid, 1.0=invisible).");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof([redacted]Transparency), 0.4f, "Faust [redacted] background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(UrielObjectSpawnerOverlayTransparency), 0.4f, "Uriel object-spawn palette overlay background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(BeelzTransformOverlayTransparency), 0.4f, "Beelz Transforms overlay background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ChatWindowOverlayTransparency), 0.3f, "Tabbed chat window background transparency (0.0=solid, 1.0=invisible).");
@@ -1402,6 +1500,9 @@ public class Settings
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(BeelzDiagnostics),            false,  "Beelzebub diagnostic details (default off). ON: the Loadout tables show each ability's ID (PrefabGUID) + raw prefab name, and Raphael writes a verbose [Beelz][diag] wire trace (commands sent + raw [BEELZ:*] replies) to the BepInEx LogOutput.log so testers/admins can report exactly which abilities work or need tuning. Toggle it from the Beelzebub → Settings tab; also implied while the global DiagnosticMode is active.");
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(UrielAvailability),           "Auto", "Whether the server has the Uriel mod (storage sharing / public prisons / stair swap / object spawning). Auto = present iff the server answered our `.uriel api version` handshake. On = always assume present. Off = always disable the URIEL tab group. Most servers don't have Uriel, so Auto stays disabled there.");
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(UrielDiagnostics),            false,  "Uriel diagnostic details (default off). ON: Raphael writes a verbose [Uriel][diag] wire trace (commands sent + raw [URIEL:*] replies) to the BepInEx LogOutput.log so testers/admins can report exactly which Uriel commands fired and what came back. Toggle it from the Uriel → Settings tab; also implied while the global DiagnosticMode is active.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustAvailability),           "Auto", "Whether the server has the Faust mod (investigation/information: castle/plot/player/server queries). Auto = present iff the server answered our `.faust api version` handshake. On = always assume present. Off = always disable the FAUST tab group. Most servers don't have Faust, so Auto stays disabled there.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustDiagnostics),            false,  "Faust diagnostic details (default off). ON: Raphael writes a verbose [Faust][diag] wire trace (commands sent + raw [FAUST:*] replies) to the BepInEx LogOutput.log so testers/admins can report exactly which Faust queries fired and what came back. Toggle it from the Faust → Settings tab; also implied while the global DiagnosticMode is active.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustDurationStyle),          0,      "How Faust writes long durations (castle decay timers in the Castle Info / All Plots tabs). 0 = Auto (the two largest non-zero units, e.g. '3w 2d' or '6h 30m' — no mental math); 1 = Hours & minutes (legacy, e.g. '734h 30m'); 2 = Days, hours, minutes; 3 = Weeks, days, hours, minutes. Cycle it from the Faust → Settings tab.");
 
         // 0.15.0: opt-in keyboard hotkeys for the floating Raphael / OV button
         // actions. Both default to KeyboardShortcut.Empty (no binding) so

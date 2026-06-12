@@ -2,13 +2,13 @@
 
 *Formerly **BloodCraftHub** — Raphael is its direct continuation and replacement.*
 
-Unified client-side V Rising UI mod that turns the chat commands of its companion server mods into buttons, forms, and on-screen overlays — first-class support for [Bloodcraft](https://thunderstore.io/c/v-rising/p/zfolmt/Bloodcraft/), **Beelzebub** (ability capture / transforms), **Uriel** (shared storage / public prisons / stair restyling / object spawning), [KindredCommands](https://thunderstore.io/c/v-rising/p/odjit/KindredCommands/), and [KindredLogistics](https://thunderstore.io/c/v-rising/p/odjit/KindredLogistics/) — with more server-side mods to come. Each mod's tab group appears only when that mod is detected on your server, so it works whether your server runs one, several, or none.
+Unified client-side V Rising UI mod that turns the chat commands of its companion server mods into buttons, forms, and on-screen overlays — first-class support for [Bloodcraft](https://thunderstore.io/c/v-rising/p/zfolmt/Bloodcraft/), **Beelzebub** (ability capture / transforms), **Uriel** (shared storage / public prisons / stair restyling / object spawning), **Faust** (server investigation & analytics: castle/plot/player intel, playtime & population reporting, clan composition), [KindredCommands](https://thunderstore.io/c/v-rising/p/odjit/KindredCommands/), and [KindredLogistics](https://thunderstore.io/c/v-rising/p/odjit/KindredLogistics/) — with more server-side mods to come. Each mod's tab group appears only when that mod is detected on your server, so it works whether your server runs one, several, or none.
 
 ---
 
 ## 📢 Renamed from BloodCraftHub — this is the replacement
 
-**Raphael, Lord of Wisdom is the same mod you knew as BloodCraftHub, rebranded — and it's the version to use going forward.** It started as a companion UI for the **Bloodcraft** server mod but grew well beyond that: it now also provides UI for **Beelzebub** and **Uriel**, a full standalone chat interface, and it will support more server-side mods over time. The broader name reflects that wider scope — and ends the frequent mix-up between this *client UI mod* and the separate *Bloodcraft* *server-side* mod (people kept opening the wrong support tickets). It joins the named family alongside Uriel and Beelzebub. **All features carry over** unchanged from the final BloodCraftHub build.
+**Raphael, Lord of Wisdom is the same mod you knew as BloodCraftHub, rebranded — and it's the version to use going forward.** It started as a companion UI for the **Bloodcraft** server mod but grew well beyond that: it now also provides UI for **Beelzebub**, **Uriel**, and **Faust**, a full standalone chat interface, and it will support more server-side mods over time. The broader name reflects that wider scope — and ends the frequent mix-up between this *client UI mod* and the separate *Bloodcraft* *server-side* mod (people kept opening the wrong support tickets). It joins the named family alongside Uriel, Beelzebub, and Faust. **All features carry over** unchanged from the final BloodCraftHub build.
 
 ## ⚠ Switching from BloodCraftHub — please read (do NOT run both)
 
@@ -67,13 +67,35 @@ If you want full Raphael functionality on a Quests-only / Professions-only serve
 ---
 
 **Repo:** https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom
-**Status:** v0.30.0 (rebranded from Raphael) — **pre-1.0 public beta**, actively developed (APIs and UI may still shift before 1.0).
+**Status:** v0.50.0 — **pre-1.0 public beta**, actively developed (APIs and UI may still shift before 1.0).
 **Beelzebub integration target:** v0.131.0 (ApiVersion 28).
-**Uriel integration target:** ApiVersion 1 (object-spawn collection).
+**Uriel integration target:** v0.19.0 (ApiVersion 1 + admin spawn conditions).
+**Faust integration target:** v0.15.0 (ApiVersion 17 — heat map + region & world coordinates).
 
-**At a glance:** a "Game UI" group (works on any server, no server mods needed) + BLOODCRAFT / KINDRED / BEELZEBUB / URIEL / SETTINGS-AND-HELP tab groups · a standalone tabbed chat window · secondary info overlays + a Beelzebub ability action-bar + a Uriel nearby-public-storage overlay · every chat command from the backing server mods surfaced as forms + buttons. Each tab group only appears when the matching server mod is detected.
+**At a glance:** a "Game UI" group (works on any server, no server mods needed) + BLOODCRAFT / KINDRED / BEELZEBUB / URIEL / FAUST / SETTINGS-AND-HELP tab groups · a standalone tabbed chat window · secondary info overlays + a Beelzebub ability action-bar + a Uriel nearby-public-storage overlay · every chat command from the backing server mods surfaced as forms + buttons. Each tab group only appears when the matching server mod is detected.
 
-**New in v0.28–v0.29** — overlay controls, a Uriel object-spawner overlay, server-switch fixes & a whisper UX overhaul:
+**New in v0.47–v0.50** — Faust through ApiVersion 17, chart & settings polish, chat scrolling:
+
+- **Faust through ApiVersion 17** — a player-position **heat map** (cold→hot gradient with selectable color ramps, full-map scale, and a detail/coarsen control), **region fill-% over time** (per-day matrix with angled region headers + per-region trend bars), **New vs returning** shown as two-color daily bars, a combined **New players** chart + "who joined" roster, a per-player **session timeline** and **active-days grid**, and **castle world coordinates** (a "Loc (X,Z)" column) in Open Plots / All Plots / Decay Watch.
+- **More readable charts** — bigger in-chart, axis, and caption text that scales with your UI text size; bars left-aligned and stretched to fill the panel; a selectable **chart color theme**.
+- **Custom text-size slider** — UI / overlay / chat text are now **50–400% sliders** (100% = the old "Standard") instead of fixed Small/Standard/Large/X-Large steps, so you can dial in any size.
+- **Settings reorganized into cards** — the **Display** and **Game UI → chat** settings are grouped into clean, titled cards instead of one long wall of toggles.
+- **Chat quality-of-life** — clickable **↑ / ↓ scroll arrows** on the chat scrollbar plus **opt-in** PageUp/PageDown and arrow-key scrolling (off by default so they don't clash with gameplay); the **@recipient** now follows the active whisper conversation when you switch tabs; and a findable **"hide game chat when hiding overlays"** setting.
+
+**New in v0.42–v0.46** — Faust reporting depth, Uriel admin config & a batch of tester fixes:
+
+- **Faust through ApiVersion 12** — a **Clans** tab (clanned-vs-solo split + rosters); Server-Stats **health dashboards** (DAU/WAU/MAU + D1/D7/D30 retention, player recency, peak concurrency, population by region); a **Player roster** with **active-today ✓ / active-this-week ✓** checkmarks; and richer **per-player** charts (by-weekday, daily/weekly trend, days-idle). Server Stats gained a **Days-window filter**, a **Refresh** button, per-chart **titles + hover tooltips** explaining each metric, and **"Show players on map"** (admin, experimental — server-side native map markers via `.faust admin showpositions`).
+- **Uriel admin config** — **Spawn conditions** (per-object / global max-per-plot, item cost, and permit-indestructible / permit-respawn), a **server-wide orphan purge**, and an **object-spacing reference** for the overlap config.
+- **Quality-of-life** — a **left-rail accordion** (opening one tab group collapses the others, for small screens; toggle to override), a **large-font layout fix** (no more text overlapping buttons), a secondary-chat **"Notes to self"** filter (+ an "exclude from All" option on the main chat), and the secondary chat now hides with the OV "hide all" button.
+
+**New in v0.31–v0.41** — Faust integration (sibling server mod: server investigation & analytics):
+
+- **FAUST tab group**, handshake-gated like Beelzebub/Uriel, that turns Faust's investigation commands into read-only intel screens: **Castle Info / Open Plots / All Plots / Decay Watch** (castle ownership, region, size, decay timers, abandoned-base housekeeping), **Castle Resources** (container totals — raid intel), **Player Info** (playtime, login frequency, busiest hour, days-idle), **Player Positions** (online-player coordinates + region), **[redacted]** (client-side scan + [redacted] + a draggable [redacted]), a **Clans** tab (clanned-vs-solo split + per-clan rosters), plus admin control/access tabs and Quick Start + Help.
+- **Server Stats + analytics dashboards** — playtime leaderboard, concurrency graph, and activity charts: by **hour of day**, **day of week**, **daily/weekly trend**, **new players**, **session lengths**, plus server-health rollups (**DAU/WAU/MAU + retention**, **player recency**, **peak concurrency**, **population by region**).
+- **Per-player reporting** — individual playtime-by-hour / by-weekday histograms, a daily/weekly activity trend, session-length habits, and an at-risk "days idle" cue, so admins can see who's active and who's drifting away.
+- All Faust screens are **ApiVersion-gated** and show a "needs newer Faust" note on older servers; client-side queries respect an anti-spam cooldown so a busy server isn't hammered. *(Tracks Faust through v0.12.0 / ApiVersion 11.)*
+
+**Earlier — v0.28–v0.29** — overlay controls, a Uriel object-spawner overlay, server-switch fixes & a whisper UX overhaul:
 
 - **Whisper overhaul (tabbed chat → Whispers tab)** — whisper **anyone connected to the server** (the old "must be nearby / have spoken" limit is gone), including a **note to yourself**; a whisper you *send* now shows **who you sent it to** (toggle: in the channel column "[→Name]" or the name column "→Name"); self-whispers read as **"Note to self"** (toggle). The Whispers tab was **restructured** — the conversation sub-tabs sit on top, and a single bottom line composes everything: a **recipient quick-switch** (reply to anyone while staying on the All-Whispers view) + a **"+ Whisper…"** picker to start a new conversation + the message box. **Privacy fix:** a whisper with no resolvable recipient can no longer fall through into Local chat.
 - **Uriel object-spawner overlay** — a draggable spawn palette (category cycler + page selector + name/ID **search**, per-row Spawn / Despawn / Rotate), plus building hotkeys moved to the top of the Object Spawning tab and a "Despawn Nearest" control.
@@ -172,6 +194,7 @@ Full per-version history lives in [`CHANGELOG.md`](CHANGELOG.md).
   - **BLOODCRAFT** (12 tabs): Familiars, Boxes, V-Bloods, All Familiars, Class, Weapon Expertise, Blood Legacy, Unarmed + Shift, Prestige, Levels, Daily Quests, Admin
   - **KINDRED** (6 tabs): Logistics, Logistics: Admin, Commands, Admin: Players, Admin: Server, Admin: World
   - **BEELZEBUB** (v0.19): Bestiary collection tracker, Loadout (universal + per-weapon **+ per-form** ability sets, incl. primary/ultimate slots), Hotkeys, Transforms, Settings, + admin Config / Players (with a per-ability shaping editor)
+  - **FAUST** (v0.31+): Castle Info, Open Plots, All Plots, Decay Watch, Castle Resources, Player Info, Clans, Player Positions, [redacted], Server Stats (playtime/concurrency/activity charts + population-health dashboards), Settings, + admin Control / Access — all read-only server investigation & analytics, ApiVersion-gated
   - **SETTINGS AND HELP**: Quick Start, Mod Help, Beelzebub Quick Start + Help, Game Guide, Settings, Vanilla Admin, About
 - **Eight secondary overlays** (toggle from footer): XP tracker (with EXO prestige), Familiar quick-glance, Familiar Browser, Daily Quest tracker, Professions (all eight Bloodcraft profession levels), Shift Spell cooldown (now showing the slotted spell's icon, v0.16), the v0.14 Combined info overlay (one panel with XP + Familiar + Weapon + Blood + Professions + Quests in configurable sections), and the v0.16 Quick Actions overlay (one-click command buttons, shipping with Stash All). Each is independently draggable + resizable, with its own background transparency setting. Visibility persists across sessions; the OV button hides/shows all currently-enabled overlays at once. Combined mode is mutually exclusive with the four standalone info overlays it replaces (XP / Familiar / Daily Quest / Professions).
 - **Freeze character actions while the UI is open** (v0.16, opt-in) — with the main panel open, optionally stop your character from moving, attacking, and casting, and block game-menu hotkeys (build, map, inventory, etc.) so nothing happens in the background while you click around the UI. Especially handy for admins who keep commands or abilities on hotkeys. Toggle in Settings → Display; off by default. Only the gameplay-input systems are suppressed — the panel, cursor, and form typing stay fully responsive.
@@ -229,6 +252,8 @@ Raphael talks to the server through chat commands and Bloodcraft's signed Eclips
 | **KindredCommands** (server) | v2.5.8 | Admin/player commands surfaced under KINDRED |
 | **KindredLogistics** (server) | v1.6.0 | Personal/admin toggles surfaced under KINDRED |
 | **Beelzebub** (server, optional) | v0.100.0 (ApiVersion 22) | Ability capture / transforms surfaced under BEELZEBUB (v0.20) |
+| **Faust** (server, optional) | v0.13.0 (ApiVersion 12) | Server investigation & analytics surfaced under FAUST (v0.31+) |
+| **Uriel** (server, optional) | v0.19.0 (ApiVersion 1) | Storage sharing / prisons / stairs / object spawning + admin config surfaced under URIEL (v0.26+) |
 | **Eclipse** (client) | v1.3.13 | Source mod for the signed-protocol design. **⚠ Compatibility needs re-testing** — was incompatible (client crash); Eclipse has since updated and we haven't re-verified. Disable Eclipse while running Raphael to be safe. See the Eclipse heads-up at the top of this README. |
 | **BloodCraftUI / OnlyFams** (client, optional) | v1.1.0 | Source mod for the panel framework; coexists, doesn't conflict |
 

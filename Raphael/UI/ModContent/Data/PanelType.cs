@@ -77,6 +77,27 @@ public enum PanelType
     UrielQuickStartTab,     // help: Uriel getting-started (lives in the Settings & Help group)
     UrielModHelpTab,        // help: Uriel mechanics + command reference (Settings & Help group)
 
+    // Faust-suite tabs (client UI for the server-side investigation/information mod; whole group gated
+    // on the `.faust api version` handshake). Player read tabs query castles/plots/players/server stats;
+    // admin tabs drive the `.faust admin …` runtime control surface (server-enforced, inline-gated like
+    // the Beelzebub/Uriel admin tabs). Positions/Resources/Admin land in Phase 2.
+    FaustCastleInfoTab,     // player: castle owner/region/size/decay (here|nearest|tindex)
+    FaustPlotsTab,          // player: open (heart-less) territories, largest first
+    FaustAllPlotsTab,       // admin: every territory (claimed + open) with full castle detail — needs `.faust api castles`
+    FaustDecayWatchTab,     // admin: claimed castles by soonest decay (housekeeping) — needs `.faust api decay` (api 9)
+    FaustResourcesTab,      // player/admin: castle container totals (raid intel) — Phase 2
+    FaustPlayerInfoTab,     // player: playtime/frequency/peak-hour (self always; others gated)
+    FaustClansTab,          // admin: clan composition (clanned vs solo split + per-clan rosters) — needs `.faust api clans` (api 11)
+    FaustPositionsTab,      // admin: online player coordinates (sortable list) — Phase 2
+    [redacted],         // player: client-side scan of [redacted] (containers / resource nodes)
+    FaustStatsTab,          // player: playtime leaderboard + concurrency series
+    FaustSettingsTab,       // client-side Faust settings: diagnostics, availability readout
+    FaustAdminControlTab,   // admin: block/unblock/schedule/status — Phase 2
+    FaustAdminAccessTab,    // admin: grant/revoke/unlocks — Phase 2
+    FaustAdminOversightTab, // admin: who-can-use-what (access) + usage/spend reporting (Faust 0.14 / api 13)
+    FaustQuickStartTab,     // help: Faust getting-started (lives in the Settings & Help group)
+    FaustModHelpTab,        // help: Faust command/feature reference (Settings & Help group)
+
     // Secondary overlays (independent draggable panels):
     ExperienceOverlay,
     FamiliarOverlay,
@@ -92,6 +113,7 @@ public enum PanelType
     BeelzTransformOverlay,  // 0.20: browser-style transform overlay (double-click to transform + phase/revert)
     UrielSharedOverlay,     // 0.26: nearby public-storage badges (client-side detection of Uriel-shared containers)
     UrielObjectSpawnerOverlay, // 0.29: draggable quick-build palette of your unlocked Uriel objects (category cycler + per-row Spawn)
+    [redacted],       // client-side "[redacted]" HUD: what the cursor is over (EntityInput.HoveredEntity) + a [redacted]s list
 
     // Legacy panel identities from BloodCraftUI — kept so the existing
     // ResizeablePanelBase config keys (Panels/<PanelType>) survive a port.

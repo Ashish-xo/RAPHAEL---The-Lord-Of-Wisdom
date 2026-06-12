@@ -118,6 +118,12 @@ public class SecondaryChatOverlayPanel : ResizeablePanelBase
         _                                => false,   // "Other" never shown
     };
 
+    // True if this line should appear: its channel is enabled, OR it's a note-to-self and the dedicated
+    // "Notes to self" toggle is on (so you can mirror just your self-notes without enabling all whispers).
+    private static bool LineEnabled(ChatRelayService.ChatLine ln)
+        => ChannelEnabled(ln.Channel)
+           || (Settings.SecondaryChatShowNotesToSelf && ChatRelayService.IsNoteToSelf(ln));
+
     private void Render()
     {
         if (_log == null) return;
@@ -131,7 +137,7 @@ public class SecondaryChatOverlayPanel : ResizeablePanelBase
         for (int i = 0; i < buf.Count; i++)
         {
             var ln = buf[i];
-            if (!ChannelEnabled(ln.Channel)) continue;
+            if (!LineEnabled(ln)) continue;
             line.Clear();
             if (showTime) line.Append("<color=#808080>").Append(ln.Received.ToString("HH:mm")).Append("</color> ");
             if (showTag)  line.Append(ChatWindowOverlayPanel.ChannelTag(ln.Channel)).Append(' ');

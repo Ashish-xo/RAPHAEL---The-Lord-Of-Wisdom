@@ -170,6 +170,11 @@ public class Plugin : BasePlugin
         // a transition frame. See BCHubUIManager.TickOverlayAvailability.
         CoreUpdateBehavior.Actions.Add(UIManager.TickOverlayAvailability);
 
+        // Faust [redacted]s — a click-through layer that floats a name tag over each nearby
+        // object's world position. The ticker is a no-op (one bool read) unless Settings.[redacted]
+        // is on; it builds its container lazily and persists visibility via the setting (no manager wiring).
+        Raphael.UI.ModContent.[redacted].EnsureTickerRegistered();
+
         // 0.18: Beelzebub detection/handshake + event-driven re-fetch driver. Sends
         // `.beelz api version` with back-off once the player is in-world; gates the
         // Beelzebub tab group on a ready=1 ACK. No-op (single bool check) once presence
@@ -192,6 +197,12 @@ public class Plugin : BasePlugin
         // keys only while build mode is ON (session-only, off by default) and a Uriel server is present;
         // suppressed while typing / panel-open. No-op (one bool check) otherwise.
         CoreUpdateBehavior.Actions.Add(Services.Uriel.UrielBuildMode.Tick);
+
+        // Faust detection/handshake driver. Sends `.faust api version` with back-off once the player is
+        // in-world; gates the Faust tab group on a ready=1 ACK and also drives the per-query in-flight
+        // timeout. No-op (bool checks) once presence is resolved; on a server without Faust it gives up
+        // after a few silent probes. Mirrors the Uriel tick above.
+        CoreUpdateBehavior.Actions.Add(Services.Faust.FaustProtocolService.Tick);
 
         // 0.17.2: selective patch manifest (was CreateAndPatchAll over the whole
         // assembly). Lets an affected player drop individual patch GROUPS via the

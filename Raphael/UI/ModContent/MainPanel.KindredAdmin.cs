@@ -368,7 +368,7 @@ public partial class MainPanel
             spacing: 6, padding: new Vector4(0, 0, 0, 0));
         UIFactory.SetLayoutElement(diagRow,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 32, preferredHeight: 32, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(32), preferredHeight: Theme.ScaledHeight(32), flexibleHeight: 0);
         AddCommandButton(diagRow, "Gruel Settings", MessageService.BCCOM_KCA_GRUEL_SETTINGS,
             "Print current gruel-conversion config (.gruelsettings).");
         AddCommandButton(diagRow, "Feed Settings",  MessageService.BCCOM_KCA_FEED_SETTINGS,
@@ -796,10 +796,15 @@ public partial class MainPanel
             TMPro.TextAlignmentOptions.TopLeft, color: null, fontSize: Theme.ScaledUI(11));
         UIFactory.SetLayoutElement(wipeNote.GameObject,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 36, preferredHeight: 48, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(36), flexibleHeight: 0);
         wipeNote.TextMesh.fontStyle = TMPro.FontStyles.Italic;
         wipeNote.TextMesh.enableWordWrapping = true;
         wipeNote.TextMesh.overflowMode = TMPro.TextOverflowModes.Overflow;
+        // 0.50: ContentSizeFitter so the wrapped warning grows with the font scale
+        // instead of clipping under the next control at Large+ text.
+        var wipeFitter = wipeNote.GameObject.AddComponent<UnityEngine.UI.ContentSizeFitter>();
+        wipeFitter.horizontalFit = UnityEngine.UI.ContentSizeFitter.FitMode.Unconstrained;
+        wipeFitter.verticalFit   = UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize;
 
         CollapsibleSection.Build(page,
             title: "Step 1: prepare wipe (.wipe)",
@@ -826,7 +831,7 @@ public partial class MainPanel
             spacing: 6, padding: new Vector4(0, 0, 0, 0));
         UIFactory.SetLayoutElement(wipeCancelRow,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 32, preferredHeight: 32, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(32), preferredHeight: Theme.ScaledHeight(32), flexibleHeight: 0);
         AddCommandButton(wipeCancelRow, "Cancel queued wipe", MessageService.BCCOM_KCA_CANCEL_WIPE,
             "Aborts a wipe queued via .wipe before .commencewipe is called.");
     }
@@ -869,10 +874,14 @@ public partial class MainPanel
             TMPro.TextAlignmentOptions.TopLeft, color: null, fontSize: Theme.ScaledUI(11));
         UIFactory.SetLayoutElement(lookupsHint.GameObject,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 40, preferredHeight: 56, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(40), flexibleHeight: 0);
         lookupsHint.TextMesh.fontStyle = TMPro.FontStyles.Italic;
         lookupsHint.TextMesh.enableWordWrapping = true;
         lookupsHint.TextMesh.overflowMode = TMPro.TextOverflowModes.Overflow;
+        // 0.50: ContentSizeFitter so the wrapped hint grows with the font scale.
+        var lookupsFitter = lookupsHint.GameObject.AddComponent<UnityEngine.UI.ContentSizeFitter>();
+        lookupsFitter.horizontalFit = UnityEngine.UI.ContentSizeFitter.FitMode.Unconstrained;
+        lookupsFitter.verticalFit   = UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize;
 
         // Quick boss-list button (no args). Same data feed as the player-facing
         // Boss List on the Kindred Commands tab; surfaced here so admins
@@ -883,7 +892,7 @@ public partial class MainPanel
             spacing: 6, padding: new Vector4(0, 0, 0, 0));
         UIFactory.SetLayoutElement(lookupsRow,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 32, preferredHeight: 32, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(32), preferredHeight: Theme.ScaledHeight(32), flexibleHeight: 0);
         AddCommandButton(lookupsRow, "List All Bosses", MessageService.BCCOM_KC_BOSS_LIST,
             "List every boss prefab the server knows about (.boss list). Reply in chat. Use one of the names with the boss-modify / lock / teleportto forms or the spawn forms below.");
 

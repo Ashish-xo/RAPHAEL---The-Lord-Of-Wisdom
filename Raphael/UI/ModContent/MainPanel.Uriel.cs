@@ -68,9 +68,13 @@ public partial class MainPanel
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true,
             spacing: 8, padding: new Vector4(2, 2, 2, 2));
+        // 0.50: scale the row height with the UI font. AddUrielButton's buttons already
+        // grow via Theme.ScaledHeight(30); without scaling the row, childControlHeight
+        // clamps them back at Large+ text and they overlap the next row (storage-sharing
+        // buttons were the reported case).
         UIFactory.SetLayoutElement(row,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         return row;
     }
 
@@ -94,11 +98,11 @@ public partial class MainPanel
     {
         var row = MakeUrielRow(parent, name + "Row");
         var t = UIFactory.CreateToggle(row, name);
-        UIFactory.SetLayoutElement(t.GameObject, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(t.GameObject, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         t.Text.text = label;
         t.Text.fontSize = Theme.ScaledUI(12);
         t.Text.alignment = TextAlignmentOptions.MidlineLeft;
-        UIFactory.SetLayoutElement(t.Text.gameObject, minWidth: 320, preferredWidth: 360, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(t.Text.gameObject, minWidth: 320, preferredWidth: 360, flexibleWidth: 1, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         t.Toggle.isOn = initial;
         if (!string.IsNullOrEmpty(tooltip)) TooltipHover.Attach(t.GameObject, tooltip);
         t.OnValueChanged += v => { try { onChanged?.Invoke(v); } catch (Exception ex) { LogUtils.LogError($"[Uriel] toggle '{name}' handler threw: {ex}"); } };
@@ -181,7 +185,7 @@ public partial class MainPanel
 
         var findRow = MakeUrielRow(build, "UrielFindRow");
         _urielFindItemInput = UIFactory.CreateInputField(findRow, "UrielFindItemInput", "Find item id by name…");
-        UIFactory.SetLayoutElement(_urielFindItemInput.GameObject, minWidth: 200, preferredWidth: 240, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(_urielFindItemInput.GameObject, minWidth: 200, preferredWidth: 240, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         AddUrielButton(findRow, "UrielFindItem", "Find item id",
             "Look up an item's numeric id by name — results (≤8) show in chat (.uriel finditem <name>). Copy the id into the cost field.",
             () => { var n = _urielFindItemInput?.Text?.Trim(); if (!string.IsNullOrEmpty(n)) UrielClient.FindItem(n); }, 130);
@@ -290,7 +294,7 @@ public partial class MainPanel
         var row = MakeUrielRow(parent, name + "Row");
         AddUrielRowLabel(row, caption);
         var input = UIFactory.CreateInputField(row, name, placeholder);
-        UIFactory.SetLayoutElement(input.GameObject, minWidth: 110, preferredWidth: 140, flexibleWidth: 0, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(input.GameObject, minWidth: 110, preferredWidth: 140, flexibleWidth: 0, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         return input;
     }
 
@@ -298,7 +302,7 @@ public partial class MainPanel
     {
         var lbl = UIFactory.CreateLabel(row, "Label", $"<color={Theme.MutedBodyHex}>{text}</color>",
             TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
-        UIFactory.SetLayoutElement(lbl.GameObject, minWidth: 200, preferredWidth: 230, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(lbl.GameObject, minWidth: 200, preferredWidth: 230, flexibleWidth: 1, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         lbl.TextMesh.enableWordWrapping = false;
         lbl.TextMesh.overflowMode = TextOverflowModes.Overflow;
     }
@@ -497,7 +501,7 @@ public partial class MainPanel
         _urielObjFilterRowGo = UIFactory.CreateGridGroup(filterCard, "UrielObjFilterRow",
             cellSize: new Vector2(Theme.ScaledWidth(92), Theme.ScaledHeight(26)),
             spacing: new Vector2(4, 4), bgColor: new Color(0, 0, 0, 0));
-        UIFactory.SetLayoutElement(_urielObjFilterRowGo, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 92, preferredHeight: 92, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(_urielObjFilterRowGo, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(92), preferredHeight: Theme.ScaledHeight(92), flexibleHeight: 0);
         RebuildUrielCategoryChips();
 
         var list = AddCard(page, "UrielObjectsList");
@@ -557,7 +561,7 @@ public partial class MainPanel
         _urielCatFilterRowGo = UIFactory.CreateGridGroup(filterCard, "UrielCatFilterRow",
             cellSize: new Vector2(Theme.ScaledWidth(92), Theme.ScaledHeight(26)),
             spacing: new Vector2(4, 4), bgColor: new Color(0, 0, 0, 0));
-        UIFactory.SetLayoutElement(_urielCatFilterRowGo, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 92, preferredHeight: 92, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(_urielCatFilterRowGo, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: Theme.ScaledHeight(92), preferredHeight: Theme.ScaledHeight(92), flexibleHeight: 0);
 
         var tableCard = AddCard(page, "UrielCatalogTable");
         AddUrielSearchRow(tableCard, "UrielCatalogSearch",
@@ -596,7 +600,7 @@ public partial class MainPanel
     {
         var l = UIFactory.CreateLabel(row, $"H_{(string.IsNullOrEmpty(text) ? "act" : text)}", text,
             TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
-        UIFactory.SetLayoutElement(l.GameObject, minWidth: width, preferredWidth: width, flexibleWidth: flex, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(l.GameObject, minWidth: width, preferredWidth: width, flexibleWidth: flex, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         l.TextMesh.fontStyle = FontStyles.Bold;
         l.TextMesh.color = new Color(0.90f, 0.72f, 0.36f);   // gold accent, matching section headings
         l.TextMesh.enableWordWrapping = false;
@@ -606,7 +610,7 @@ public partial class MainPanel
     private void AddUrielTextCell(GameObject row, string richText, int width, int flex)
     {
         var l = UIFactory.CreateLabel(row, "Cell", richText, TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
-        UIFactory.SetLayoutElement(l.GameObject, minWidth: width, preferredWidth: width, flexibleWidth: flex, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(l.GameObject, minWidth: width, preferredWidth: width, flexibleWidth: flex, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         l.TextMesh.enableWordWrapping = false;
         l.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
     }
@@ -809,7 +813,7 @@ public partial class MainPanel
         var row = MakeUrielRow(parent, name + "Row");
         AddUrielRowLabel(row, "Search (name or ID)");
         var input = UIFactory.CreateInputField(row, name, "type to filter…");
-        UIFactory.SetLayoutElement(input.GameObject, minWidth: 140, preferredWidth: 200, flexibleWidth: 1, minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        UIFactory.SetLayoutElement(input.GameObject, minWidth: 140, preferredWidth: 200, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         input.OnValueChanged += v => { try { onChanged?.Invoke(v ?? ""); } catch (Exception ex) { LogUtils.LogError($"[Uriel] search '{name}' handler threw: {ex}"); } };
         AddUrielButton(row, name + "Clear", "Clear", "Clear the search filter.", () => { input.Text = ""; }, 60);
         return input;
@@ -868,7 +872,7 @@ public partial class MainPanel
             var lbl = UIFactory.CreateLabel(prow, "UrielPageLbl",
                 $"<color={Theme.MutedBodyHex}>Page {cur + 1}/{pages}  ·  {filtered.Count} items</color>",
                 TextAlignmentOptions.Center, color: null, fontSize: Theme.ScaledUI(12));
-            UIFactory.SetLayoutElement(lbl.GameObject, minWidth: 120, preferredWidth: 200, flexibleWidth: 1, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            UIFactory.SetLayoutElement(lbl.GameObject, minWidth: 120, preferredWidth: 200, flexibleWidth: 1, minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
             lbl.TextMesh.enableWordWrapping = false;
             lbl.TextMesh.overflowMode = TextOverflowModes.Overflow;
             if (cur < pages - 1)
@@ -985,11 +989,40 @@ public partial class MainPanel
             if (UrielState.Present && UrielState.ObjectSpawnEnabled)
             {
                 int denom = UrielState.DiscoverablePrefabs;
-                string pct = denom > 0 ? $"{UrielState.UnlockedPct:0.#}%" : "—";
-                _urielObjectsProgressLabel.text =
-                    $"Unlocked <b>{UrielState.UnlockedCount}</b>" + (denom > 0 ? $" / {denom} discoverable" : "") +
-                    $"  ·  collection <b>{pct}</b>" +
-                    (string.IsNullOrEmpty(UrielState.DiscoveryMode) ? "" : $"  ·  mode {UrielState.DiscoveryMode}");
+                int n     = UrielState.UnlockedCount;
+                bool fullMode = string.Equals(UrielState.DiscoveryMode, "Full", StringComparison.OrdinalIgnoreCase);
+
+                if (!UrielState.CollectionEnabled || fullMode)
+                {
+                    // Collection off / Full mode: every object is available to everyone, so a
+                    // "collected / discoverable" fraction is meaningless (it read >100% because the unlocked
+                    // count includes non-discoverable objects). Show the available count instead.
+                    _urielObjectsProgressLabel.text =
+                        $"<b>{n}</b> object(s) available to you" +
+                        (fullMode ? "  ·  mode <b>Full</b> (everything unlocked)" : "  ·  collection <b>off</b>");
+                }
+                else
+                {
+                    // Discovery mode: progress is measured against the DISCOVERABLE set only. The real
+                    // numerator is how many DISCOVERABLE objects the player has (disc=1 among their unlocked
+                    // rows) — NOT the raw unlocked count `n`, which also counts non-discoverable (granted /
+                    // always-available) objects and so can exceed the discoverable total (the old ">100%" bug).
+                    int discColl;
+                    if (UrielState.Unlocked.Count > 0)
+                    {
+                        int c = 0;
+                        foreach (var o in UrielState.Unlocked) if (o.Discoverable) c++;
+                        discColl = denom > 0 ? Math.Min(denom, c) : c;
+                    }
+                    else discColl = denom > 0 ? (int)Math.Round(UrielState.UnlockedPct / 100f * denom) : 0;
+
+                    float pct = denom > 0 ? 100f * discColl / denom : 0f;
+                    _urielObjectsProgressLabel.text =
+                        (denom > 0 ? $"Discoverable found <b>{discColl}</b> / {denom}  ·  <b>{pct:0.#}%</b>"
+                                   : $"Unlocked <b>{n}</b>") +
+                        (n > discColl ? $"  ·  {n} unlocked total" : "") +
+                        (string.IsNullOrEmpty(UrielState.DiscoveryMode) ? "" : $"  ·  mode {UrielState.DiscoveryMode}");
+                }
             }
             else if (UrielState.Present)
                 _urielObjectsProgressLabel.text = "Object collection is disabled on this server.";
@@ -1042,6 +1075,12 @@ public partial class MainPanel
     private string _urielGrantAllSubset = "all";  // all | destructible | indestructible
     private ButtonRef _urielGrantAllSubsetBtn;
 
+    // Spawn-conditions (objcfg / objcfgglobal) admin fields — per-object/global player spawn limits.
+    private string _urielCfgPrefab = "";
+    private InputFieldRef _urielCfgMaxInput;
+    private InputFieldRef _urielCfgCostAmtInput;
+    private InputFieldRef _urielCfgCostItemInput;
+
     private ButtonRef AddUrielConfirmButton(GameObject parent, string name, string label, string tooltip,
                                             Action action, int width = 120, Color? color = null)
     {
@@ -1068,6 +1107,14 @@ public partial class MainPanel
     }
 
     private static bool ReqUriel(string s, out string v) { v = (s ?? "").Trim(); return v.Length > 0; }
+
+    // Require a non-negative integer from an input field (for objcfg max / cost amount).
+    private static bool ReqUrielInt(InputFieldRef field, out int n)
+    {
+        n = 0;
+        var t = (field?.Text ?? "").Trim();
+        return t.Length > 0 && int.TryParse(t, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out n) && n >= 0;
+    }
 
     // Prefab autocomplete off the loaded catalog (name → GUID). Empty until the Object Catalog is loaded;
     // the field still accepts a typed name/GUID, which block/grant/revoke also accept.
@@ -1183,6 +1230,91 @@ public partial class MainPanel
             "Grant this player ALL placeable objects in the chosen subset (.uriel grantall <player> <subset>).",
             () => { if (ReqUriel(_urielObjPlayer, out var n)) UrielClient.SendUser($".uriel grantall {n} {_urielGrantAllSubset}"); }, 110, UrielDanger);
 
+        // --- Spawn conditions for players (per-object + global; Uriel 0.18+, admins bypass) ---
+        var cfgCard = AddCard(content, "UrielAdminCfgCard");
+        AddSectionHeading(cfgCard, "Spawn conditions (players)");
+        AddBodyText(cfgCard,
+            "Limits applied to <b>non-admin players'</b> spawns (admins bypass): a <b>max per plot</b>, a <b>per-spawn " +
+            "item cost</b>, and whether they may use <b>indestructible</b> / <b>respawn</b>. Set them <b>per-object</b> " +
+            "or as a <b>global default</b>; a refused spawn replies in chat. Stored server-side.");
+        var cfgListRow = MakeUrielRow(cfgCard, "UrielCfgListRow");
+        AddUrielButton(cfgListRow, "UrielCfgList", "List all conditions",
+            "Show the global default + every per-object override in chat (.uriel objcfglist).",
+            () => UrielClient.SendUser(".uriel objcfglist"), 160);
+
+        // ════ Per-object ════ — pick an object, then each row sets ONE field on it.
+        AddSectionHeading(cfgCard, "▸ Per-object override");
+        AddBodyText(cfgCard, "Choose an object, then set a field below. Each field's input sits directly above its button.");
+        AddBeelzSearchableField(cfgCard, "UrielCfgPrefab", "Object name or GUID…", "", UrielPrefabMatches, v => _urielCfgPrefab = v);
+
+        // Max per plot — input then button.
+        _urielCfgMaxInput = AddUrielLabeledInput(cfgCard, "UrielCfgMax", "Max per plot (0 = unlimited)", "e.g. 3");
+        var maxRow = MakeUrielRow(cfgCard, "UrielCfgMaxRow");
+        AddUrielButton(maxRow, "UrielCfgSetMax", "Set max for this object",
+            "Limit how many of this object a player may have per plot (.uriel objcfg <obj> max <n>).",
+            () => { if (ReqUriel(_urielCfgPrefab, out var p) && ReqUrielInt(_urielCfgMaxInput, out var n)) UrielClient.SendUser($".uriel objcfg {p} max {n}"); }, 190);
+
+        // Cost — two inputs then button.
+        _urielCfgCostAmtInput  = AddUrielLabeledInput(cfgCard, "UrielCfgCostAmt", "Cost amount (0 = free)", "e.g. 5");
+        _urielCfgCostItemInput = AddUrielLabeledInput(cfgCard, "UrielCfgCostItem", "Cost item GUID", "item GUID (.uriel finditem)");
+        var costRow = MakeUrielRow(cfgCard, "UrielCfgCostRow");
+        AddUrielButton(costRow, "UrielCfgSetCost", "Set cost for this object",
+            "Charge this item per spawn of the object (.uriel objcfg <obj> cost <amount> <itemGuid>).",
+            () => { if (ReqUriel(_urielCfgPrefab, out var p) && ReqUrielInt(_urielCfgCostAmtInput, out var amt) && ReqUriel(_urielCfgCostItemInput?.Text, out var item)) UrielClient.SendUser($".uriel objcfg {p} cost {amt} {item}"); }, 190);
+
+        // Permit flags — one row each, "allowed?" yes/no.
+        AddBodyText(cfgCard, "May players spawn this object <b>indestructible</b>?");
+        var indRow = MakeUrielRow(cfgCard, "UrielCfgIndRow");
+        AddUrielButton(indRow, "UrielCfgIndAllow", "Yes",
+            "Let players spawn this object indestructible (.uriel objcfg <obj> indestructible true).",
+            () => { if (ReqUriel(_urielCfgPrefab, out var p)) UrielClient.SendUser($".uriel objcfg {p} indestructible true"); }, 90);
+        AddUrielButton(indRow, "UrielCfgIndForbid", "No",
+            "Forbid players from spawning this object indestructible (.uriel objcfg <obj> indestructible false).",
+            () => { if (ReqUriel(_urielCfgPrefab, out var p)) UrielClient.SendUser($".uriel objcfg {p} indestructible false"); }, 90);
+        AddBodyText(cfgCard, "May players use the <b>respawn</b> flag on it?");
+        var resRow = MakeUrielRow(cfgCard, "UrielCfgResRow");
+        AddUrielButton(resRow, "UrielCfgResAllow", "Yes",
+            "Let players use the respawn flag on this object (.uriel objcfg <obj> respawn true).",
+            () => { if (ReqUriel(_urielCfgPrefab, out var p)) UrielClient.SendUser($".uriel objcfg {p} respawn true"); }, 90);
+        AddUrielButton(resRow, "UrielCfgResForbid", "No",
+            "Forbid the respawn flag on this object (.uriel objcfg <obj> respawn false).",
+            () => { if (ReqUriel(_urielCfgPrefab, out var p)) UrielClient.SendUser($".uriel objcfg {p} respawn false"); }, 90);
+
+        var soRow = MakeUrielRow(cfgCard, "UrielCfgShowRow");
+        AddUrielButton(soRow, "UrielCfgShow", "Show this object",
+            "Show this object's current spawn conditions in chat (.uriel objcfg <obj> show).",
+            () => { if (ReqUriel(_urielCfgPrefab, out var p)) UrielClient.SendUser($".uriel objcfg {p} show"); }, 140);
+        AddUrielConfirmButton(soRow, "UrielCfgClear", "Clear this object",
+            "Remove this object's overrides so it falls back to the global default (.uriel objcfg <obj> clear).",
+            () => { if (ReqUriel(_urielCfgPrefab, out var p)) UrielClient.SendUser($".uriel objcfg {p} clear"); }, 150, UrielDanger);
+
+        // ════ Global default ════ — same fields, applied to every object without its own override.
+        AddSectionHeading(cfgCard, "▸ Global default (all objects)");
+        AddBodyText(cfgCard, "Applies to every object that has no per-object override. <b>Max / cost use the input fields above.</b>");
+        var gNumRow = MakeUrielRow(cfgCard, "UrielCfgGNumRow");
+        AddUrielButton(gNumRow, "UrielCfgGlobMax", "Set global max",
+            "Default max-per-plot for every object (.uriel objcfgglobal max <n>). Uses the Max field above.",
+            () => { if (ReqUrielInt(_urielCfgMaxInput, out var n)) UrielClient.SendUser($".uriel objcfgglobal max {n}"); }, 130);
+        AddUrielButton(gNumRow, "UrielCfgGlobCost", "Set global cost",
+            "Default per-spawn cost for every object (.uriel objcfgglobal cost <amount> <itemGuid>). Uses the Cost fields above.",
+            () => { if (ReqUrielInt(_urielCfgCostAmtInput, out var amt) && ReqUriel(_urielCfgCostItemInput?.Text, out var item)) UrielClient.SendUser($".uriel objcfgglobal cost {amt} {item}"); }, 130);
+        AddBodyText(cfgCard, "Default — may players spawn <b>indestructible</b>?");
+        var gIndRow = MakeUrielRow(cfgCard, "UrielCfgGIndRow");
+        AddUrielButton(gIndRow, "UrielCfgGlobIndAllow", "Yes",
+            "Default-allow players to spawn indestructible (.uriel objcfgglobal indestructible true).",
+            () => UrielClient.SendUser(".uriel objcfgglobal indestructible true"), 90);
+        AddUrielButton(gIndRow, "UrielCfgGlobIndForbid", "No",
+            "Default-forbid players from spawning indestructible (.uriel objcfgglobal indestructible false).",
+            () => UrielClient.SendUser(".uriel objcfgglobal indestructible false"), 90);
+        AddBodyText(cfgCard, "Default — may players use the <b>respawn</b> flag?");
+        var gResRow = MakeUrielRow(cfgCard, "UrielCfgGResRow");
+        AddUrielButton(gResRow, "UrielCfgGlobResAllow", "Yes",
+            "Default-allow the respawn flag (.uriel objcfgglobal respawn true).",
+            () => UrielClient.SendUser(".uriel objcfgglobal respawn true"), 90);
+        AddUrielButton(gResRow, "UrielCfgGlobResForbid", "No",
+            "Default-forbid the respawn flag (.uriel objcfgglobal respawn false).",
+            () => UrielClient.SendUser(".uriel objcfgglobal respawn false"), 90);
+
         // --- Plot tools (act on the plot the admin is standing in) ---
         var plotCard = AddCard(content, "UrielAdminPlotCard");
         AddSectionHeading(plotCard, "Plot tools (your current plot)");
@@ -1204,6 +1336,36 @@ public partial class MainPanel
         AddUrielButton(fRow, "UrielForceDespawnConfirm", "Confirm",
             "Confirm the armed force-despawn within 30s of arming (.uriel forcedespawn confirm).",
             () => UrielClient.SendUser(".uriel forcedespawn confirm"), 100);
+
+        // Server-wide orphan sweep (not plot-scoped) — removes tracked objects whose castle heart is gone.
+        AddBodyText(plotCard,
+            "<b>Server-wide:</b> remove Uriel objects whose castle heart is gone (castle destroyed / decayed / open world). " +
+            "Only Uriel's own objects are touched; native objects are never affected.");
+        var oRow = MakeUrielRow(plotCard, "UrielPlotRow3");
+        AddUrielConfirmButton(oRow, "UrielPurgeOrphans", "Purge orphans (server-wide)",
+            "Scan the WHOLE map and remove orphaned Uriel objects no longer governed by a living castle heart (.uriel purgeorphans).",
+            () => UrielClient.SendUser(".uriel purgeorphans"), 200, UrielWipe);
+
+        // --- Object spacing / overlap (SERVER CONFIG — no chat command; reference only) ---
+        var spaceCard = AddCard(content, "UrielAdminSpacingCard");
+        AddSectionHeading(spaceCard, "Object spacing / overlap (server config)");
+        AddBodyText(spaceCard,
+            "How close spawned objects may be placed is a <b>server config value</b> — Uriel exposes <b>no chat " +
+            "command</b> for it, so Raphael can't change it live. Edit it in the Uriel mod's config on the " +
+            $"<b>server</b> ({Mono("BepInEx/config/")} → the Uriel {Mono(".cfg")}, section {Mono("[ObjectSpawn]")}), " +
+            "then restart / reload the server:");
+        AddBodyText(spaceCard,
+            $"• {Mono("OverlapMinDistance")} <color=#9FD0FF>(default 0.5)</color> — minimum spacing in <b>meters</b> " +
+            "(center-to-center) Uriel keeps between a spawned/moved object and a nearby non-wall object. " +
+            "<b>Lower it toward 0</b> to let players place décor closer together / tighter around furniture; " +
+            "<b>0 disables</b> the proximity backstop. This is the “distance allowed between objects.”\n" +
+            $"• {Mono("PreventOverlap")} <color=#9FD0FF>(default true)</color> — the master switch. When <b>true</b>, " +
+            "objects can't be dropped inside walls / stations / props / other objects (floors excepted). Set " +
+            "<b>false</b> to allow free stacking/overlap entirely (e.g. a candle directly on a table), at your own risk.");
+        AddBodyText(spaceCard,
+            $"<color=#FFB070>Tip:</color> a refused spawn replies in chat ({Mono("Can't place … it would overlap …")}); " +
+            "if players hit that too often, lower OverlapMinDistance. <i>If you'd like to set this live from here " +
+            "instead of the config file, that needs a new Uriel chat command — ask and it can be requested.</i>");
     }
 
     private string UrielGrantAllSubsetLabel() => $"Subset: {_urielGrantAllSubset}";
@@ -1368,7 +1530,10 @@ public partial class MainPanel
             "• .uriel block / unblock / blocklist — manage the spawn blocklist.\n" +
             "• .uriel grant / revoke / grantall — manage a player's unlocked prefabs.\n" +
             "• .uriel unlocks (player) — inspect a player's unlocked set.\n" +
+            "• .uriel objcfg (obj) max|cost|indestructible|respawn|clear|show — per-object spawn limits for players.\n" +
+            "• .uriel objcfgglobal (field) — the global default spawn limit.   • .uriel objcfglist — list all conditions.\n" +
             "• .uriel bossmap — boss→prefab mapping.   • .uriel purgeplot — clear a plot.\n" +
+            "• .uriel purgeorphans — server-wide: remove objects whose castle heart is gone.\n" +
             "• .uriel forcedespawn (confirm) / .uriel forcepurgeplot — record-ignoring recovery for untracked " +
             "objects (arm → names the prefab → confirm within 30s).");
 

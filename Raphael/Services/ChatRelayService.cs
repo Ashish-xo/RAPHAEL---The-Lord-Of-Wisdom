@@ -203,6 +203,13 @@ internal static class ChatRelayService
         return !string.IsNullOrEmpty(me) && string.Equals(sender.Trim(), me.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
+    // A "note to self" — a whisper you sent to your OWN character (sender and partner both you). Shared by
+    // the tabbed chat window and the secondary view-only window so both classify them identically.
+    internal static bool IsNoteToSelf(ChatLine ln)
+        => ln.Channel == Channel.Whisper
+           && !string.IsNullOrEmpty(ln.Sender)  && IsOwnSender(ln.Sender)
+           && !string.IsNullOrEmpty(ln.Partner) && IsOwnSender(ln.Partner);
+
     private static string _localName;
     private static string LocalPlayerName()
     {

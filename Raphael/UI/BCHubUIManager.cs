@@ -39,6 +39,7 @@ public class BCHubUIManager : UIManagerBase
     private BeelzSummonsOverlayPanel _beelzSummonsOverlay; // 0.19: one-click stash/restore for Beelzebub summons
     private BeelzTransformOverlayPanel _beelzTransformOverlay; // 0.20: browser-style transform/phase/revert overlay
     private UrielSharedOverlayPanel _urielSharedOverlay; // 0.26: nearby public-storage badges (client-side detection)
+    private [redacted] [redacted]; // Faust [redacted] HUD (client-side [redacted] + nearby list)
     private UrielObjectSpawnerOverlayPanel _urielObjectSpawnerOverlay; // 0.29: quick-build object-spawn palette
     private ChatWindowOverlayPanel _chatWindowOverlay; // 0.17: standalone tabbed chat window
     private SecondaryChatOverlayPanel _secondaryChatOverlay; // 0.24: view-only second chat window (channel subset)
@@ -116,6 +117,7 @@ public class BCHubUIManager : UIManagerBase
         ApplyPinnedTo(_beelzTransformOverlay, pinned);
         ApplyPinnedTo(_urielSharedOverlay, pinned);
         ApplyPinnedTo(_urielObjectSpawnerOverlay, pinned);
+        ApplyPinnedTo([redacted], pinned);   // was missing — the Faust [redacted] ignored the Lock-overlays toggle, so once pinned it could never be unpinned (drag/resize stayed dead even after unlock)
         ApplyPinnedTo(_chatWindowOverlay, pinned);
         ApplyPinnedTo(_secondaryChatOverlay, pinned);
         ApplyPinnedTo(_combinedOverlay, pinned);
@@ -367,6 +369,11 @@ public class BCHubUIManager : UIManagerBase
                 _urielObjectSpawnerOverlay.SetActive(!_urielObjectSpawnerOverlay.Enabled);
                 Raphael.Config.Settings.SetShowUrielObjectSpawnerOverlay(_urielObjectSpawnerOverlay.Enabled);
                 break;
+            case PanelType.[redacted]:
+                Ensure[redacted]();
+                [redacted].SetActive(![redacted].Enabled);
+                Raphael.Config.Settings.SetShow[redacted]([redacted].Enabled);
+                break;
             case PanelType.ChatWindowOverlay:
                 EnsureChatWindowOverlay();
                 _chatWindowOverlay.SetActive(!_chatWindowOverlay.Enabled);
@@ -521,6 +528,7 @@ public class BCHubUIManager : UIManagerBase
             if (Raphael.Config.Settings.HideChatWithOverlaysToggle)
             {
                 _chatWindowOverlay?.SetActive(false);
+                _secondaryChatOverlay?.SetActive(false);   // the view-only second window hides with OV too
                 ApplyNativeChatVisibility();
             }
             return;
@@ -590,6 +598,12 @@ public class BCHubUIManager : UIManagerBase
         {
             EnsureUrielObjectSpawnerOverlay();
             _urielObjectSpawnerOverlay.SetActive(true);
+        }
+        // Faust [redacted] is pure client-side (reads the local cursor target) — no server gating.
+        if (Raphael.Config.Settings.Show[redacted])
+        {
+            Ensure[redacted]();
+            [redacted].SetActive(true);
         }
         if (Raphael.Config.Settings.ShowChatWindowOverlay)
         {
@@ -749,6 +763,12 @@ public class BCHubUIManager : UIManagerBase
         {
             EnsureUrielObjectSpawnerOverlay();
             _urielObjectSpawnerOverlay.SetActive(true);
+        }
+        // Faust [redacted] is pure client-side (reads the local cursor target) — no server gating.
+        if (Raphael.Config.Settings.Show[redacted])
+        {
+            Ensure[redacted]();
+            [redacted].SetActive(true);
         }
         if (Raphael.Config.Settings.ShowChatWindowOverlay)
         {
@@ -940,6 +960,13 @@ public class BCHubUIManager : UIManagerBase
                 _urielObjectSpawnerOverlay.SetActive(true);
             }
 
+            // ---- Faust [redacted] ---- (client-side; no server gating, but honors suppression)
+            if (!_overlaysSuppressed && Raphael.Config.Settings.Show[redacted])
+            {
+                Ensure[redacted]();
+                [redacted].SetActive(true);
+            }
+
             _mainPanel?.RefreshAllOverlayToggleStates();
         }
         catch (System.Exception ex)
@@ -962,6 +989,7 @@ public class BCHubUIManager : UIManagerBase
         PanelType.BeelzTransformOverlay  => _beelzTransformOverlay?.Enabled ?? false,
         PanelType.UrielSharedOverlay     => _urielSharedOverlay?.Enabled ?? false,
         PanelType.UrielObjectSpawnerOverlay => _urielObjectSpawnerOverlay?.Enabled ?? false,
+        PanelType.[redacted]       => [redacted]?.Enabled ?? false,
         PanelType.ChatWindowOverlay      => _chatWindowOverlay?.Enabled ?? false,
         PanelType.SecondaryChatOverlay   => _secondaryChatOverlay?.Enabled ?? false,
         PanelType.CombinedOverlay        => _combinedOverlay?.Enabled ?? false,
@@ -1055,6 +1083,15 @@ public class BCHubUIManager : UIManagerBase
         _panels.Add(_urielSharedOverlay);
         _urielSharedOverlay.SetActive(false);
     }
+
+    private void Ensure[redacted]()
+    {
+        if ([redacted] != null) return;
+        [redacted] = new [redacted](UiBase);
+        _panels.Add([redacted]);
+        [redacted].SetActive(false);
+    }
+
 
     private void EnsureUrielObjectSpawnerOverlay()
     {
@@ -1459,6 +1496,7 @@ public class BCHubUIManager : UIManagerBase
         RebuildOverlay(ref _beelzSummonsOverlay,    Raphael.Config.Settings.ShowBeelzSummonsOverlay,            b => new BeelzSummonsOverlayPanel(b));
         RebuildOverlay(ref _beelzTransformOverlay,  Raphael.Config.Settings.ShowBeelzTransformOverlay,          b => new BeelzTransformOverlayPanel(b));
         RebuildOverlay(ref _urielSharedOverlay,     Raphael.Config.Settings.ShowUrielSharedOverlay,             b => new UrielSharedOverlayPanel(b));
+        RebuildOverlay(ref [redacted],       Raphael.Config.Settings.Show[redacted],               b => new [redacted](b));
         RebuildOverlay(ref _chatWindowOverlay,      Raphael.Config.Settings.ShowChatWindowOverlay,              b => new ChatWindowOverlayPanel(b));
         RebuildOverlay(ref _secondaryChatOverlay,   Raphael.Config.Settings.ShowSecondaryChatOverlay,           b => new SecondaryChatOverlayPanel(b));
         // 0.14.0: combined overlay is now part of the rebuild so its text

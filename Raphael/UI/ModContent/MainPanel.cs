@@ -341,6 +341,34 @@ public partial class MainPanel : ResizeablePanelBase
         },
         new TabGroupDef
         {
+            // Client UI for the server-side Faust mod (investigation / information: castle, plot,
+            // player, and server-stat queries). The whole group is gated on the `.faust api version`
+            // handshake (see IsTabGroupAvailable("Faust")) — most servers won't have Faust, so it stays
+            // unavailable until detected. Player read tabs first; admin tabs are inline (always visible
+            // with a "requires admin" gate; the server enforces permissions — same model as the other
+            // admin tabs). Positions / Resources / Admin tabs render a Phase-2 "coming soon" stub today.
+            Title = "Faust",
+            StartExpanded = false,
+            Tabs = new[]
+            {
+                (PanelType.FaustCastleInfoTab,   "Castle Info"),
+                (PanelType.FaustPlotsTab,        "Open Plots"),
+                (PanelType.FaustAllPlotsTab,     "All Plots"),
+                (PanelType.FaustDecayWatchTab,   "Decay Watch"),
+                (PanelType.FaustResourcesTab,    "Castle Resources"),
+                (PanelType.FaustPlayerInfoTab,   "Player Info"),
+                (PanelType.FaustClansTab,        "Clans"),
+                (PanelType.FaustPositionsTab,    "Player Positions"),
+                (PanelType.[redacted],       "[redacted]"),
+                (PanelType.FaustStatsTab,        "Server Stats"),
+                (PanelType.FaustSettingsTab,     "Settings"),
+                (PanelType.FaustAdminControlTab, "Admin: Control"),
+                (PanelType.FaustAdminAccessTab,  "Admin: Access"),
+                (PanelType.FaustAdminOversightTab, "Admin: Oversight"),
+            },
+        },
+        new TabGroupDef
+        {
             // 0.17: standalone client-side UI enhancements that work on ANY
             // server, with no Bloodcraft/Kindred dependency. Always available
             // (see IsTabGroupAvailable) so it shows even on vanilla servers.
@@ -379,6 +407,11 @@ public partial class MainPanel : ResizeablePanelBase
                 // mod (sibling to the Bloodcraft / Beelzebub ones above).
                 (PanelType.UrielQuickStartTab, "Uriel Quick Start"),
                 (PanelType.UrielModHelpTab,    "Uriel Help"),
+                // Faust is informational-only and lighter than Bloodcraft/Beelzebub/Uriel, so its
+                // getting-started + command reference are merged into ONE guide tab (rather than the
+                // separate Quick Start / Help pair the other mods get). FaustModHelpTab's content is
+                // appended under the quick start in the FaustQuickStartTab dispatch below.
+                (PanelType.FaustQuickStartTab, "Faust Guide"),
                 // 0.12.1: V Rising game guide + community-resource links.
                 (PanelType.GameGuideTab,     "Game Guide"),
                 (PanelType.SettingsTab,      "Settings"),
@@ -870,6 +903,11 @@ public partial class MainPanel : ResizeablePanelBase
             // a late ACK that misses the single deferred refresh still reconciles the group header.
             Services.Uriel.UrielProtocolService.AvailabilityChanged += OnBloodcraftAvailabilityChanged;
             Services.Uriel.UrielState.PresenceChanged += OnBloodcraftAvailabilityChanged;
+            // Faust presence transitions flip the Faust group available/unavailable. Same dual
+            // subscription as Beelzebub/Uriel (one-shot AvailabilityChanged + the repeated PresenceChanged)
+            // so a late ACK that misses the single deferred refresh still reconciles the group header.
+            Services.Faust.FaustProtocolService.AvailabilityChanged += OnBloodcraftAvailabilityChanged;
+            Services.Faust.FaustState.PresenceChanged += OnBloodcraftAvailabilityChanged;
             _availabilitySubscribed = true;
         }
 
@@ -885,9 +923,15 @@ public partial class MainPanel : ResizeablePanelBase
         // collapse but DOES scroll cleanly when there's too much of it.
         var scrollWrap = UIFactory.CreateScrollView(parent, "TabStripScroll",
             out var stripContent, out _, color: Color.clear);
+        // 0.49: the rail width tracks the UI font multiplier (Theme.ScaledWidth). The left pane is
+        // normally a fixed width, but at large font-size-% settings the longest tab captions outgrew
+        // the fixed 220px strip and the centered button text overflowed past the button's right edge
+        // (tester report). Scaling the strip (and the button/container widths below) in lockstep with
+        // the font keeps captions inside their buttons; the content area (flexibleWidth:1) absorbs the
+        // difference, so the pane only grows as much as the text requires.
         UIFactory.SetLayoutElement(scrollWrap,
-            minWidth: (int)TAB_STRIP_MAX_WIDTH,
-            preferredWidth: (int)TAB_STRIP_MAX_WIDTH,
+            minWidth: Theme.ScaledWidth((int)TAB_STRIP_MAX_WIDTH),
+            preferredWidth: Theme.ScaledWidth((int)TAB_STRIP_MAX_WIDTH),
             flexibleWidth: 0,
             flexibleHeight: 1);
 
@@ -946,7 +990,7 @@ public partial class MainPanel : ResizeablePanelBase
         var header = UIFactory.CreateButton(parent, $"GroupHeader_{group.Title}",
             FormatGroupHeader(group.Title, startExpanded, available || diagnostic));
         UIFactory.SetLayoutElement(header.GameObject,
-            minWidth: 140, preferredWidth: 144, flexibleWidth: 1,
+            minWidth: Theme.ScaledWidth(140), preferredWidth: Theme.ScaledWidth(144), flexibleWidth: 1,
             minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
         var headerText = header.Component.GetComponentInChildren<TextMeshProUGUI>();
         if (headerText != null)
@@ -985,7 +1029,7 @@ public partial class MainPanel : ResizeablePanelBase
         // height AND the strip scrolls when overflow happens.
         int groupContentHeight = Mathf.Max(28, group.Tabs.Length * 30 + 4);
         UIFactory.SetLayoutElement(content,
-            minWidth: 140, preferredWidth: 144, flexibleWidth: 1,
+            minWidth: Theme.ScaledWidth(140), preferredWidth: Theme.ScaledWidth(144), flexibleWidth: 1,
             minHeight: groupContentHeight, preferredHeight: groupContentHeight, flexibleHeight: 0);
         _groupContent[group.Title] = content;
 
@@ -996,7 +1040,7 @@ public partial class MainPanel : ResizeablePanelBase
             childControlWidth: true, childControlHeight: true,
             spacing: 2, padding: new Vector4(0, 0, 0, 0));
         UIFactory.SetLayoutElement(tabListGo,
-            minWidth: 130, preferredWidth: 140, flexibleWidth: 1,
+            minWidth: Theme.ScaledWidth(130), preferredWidth: Theme.ScaledWidth(140), flexibleWidth: 1,
             minHeight: 0, flexibleHeight: 0);
         _groupTabListGo[group.Title] = tabListGo;
 
@@ -1006,7 +1050,7 @@ public partial class MainPanel : ResizeablePanelBase
                 "(coming soon)",
                 TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
             UIFactory.SetLayoutElement(placeholder.GameObject,
-                minWidth: 130, preferredWidth: 140, flexibleWidth: 1,
+                minWidth: Theme.ScaledWidth(130), preferredWidth: Theme.ScaledWidth(140), flexibleWidth: 1,
                 minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
             placeholder.TextMesh.fontStyle = FontStyles.Italic;
             placeholder.TextMesh.enableWordWrapping = false;
@@ -1017,7 +1061,7 @@ public partial class MainPanel : ResizeablePanelBase
             {
                 var b = UIFactory.CreateButton(tabListGo, $"TabBtn_{tab}", label);
                 UIFactory.SetLayoutElement(b.GameObject,
-                    minWidth: 130, preferredWidth: 138, flexibleWidth: 1,
+                    minWidth: Theme.ScaledWidth(130), preferredWidth: Theme.ScaledWidth(138), flexibleWidth: 1,
                     minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
                 var t = b.Component.GetComponentInChildren<TextMeshProUGUI>();
                 if (t != null)
@@ -1044,6 +1088,8 @@ public partial class MainPanel : ResizeablePanelBase
             BuildBeelzDiagnosticPanel(content);
         else if (group.Title == "Uriel")
             BuildUrielDiagnosticPanel(content);
+        else if (group.Title == "Faust")
+            BuildFaustDiagnosticPanel(content);
 
         // Apply initial visibility — diagnostic OR sub-tab list, never both.
         ApplyModGroupVisibility(group.Title, diagnostic);
@@ -1064,6 +1110,7 @@ public partial class MainPanel : ResizeablePanelBase
         GameObject diagGo = groupTitle == "Bloodcraft" ? _bloodcraftDiagnosticGo
                           : groupTitle == "Beelzebub"  ? _beelzDiagnosticGo
                           : groupTitle == "Uriel"      ? _urielDiagnosticGo
+                          : groupTitle == "Faust"      ? _faustDiagnosticGo
                           : null;
         if (diagGo != null) diagGo.SetActive(diagnostic);
     }
@@ -1420,6 +1467,16 @@ public partial class MainPanel : ResizeablePanelBase
                     // confirms Uriel; recover via the inline diagnostic Re-check or Connection → Re-detect.
                     _ => Services.Uriel.UrielProtocolService.IsPresent,
                 };
+            case "Faust":
+                return Settings.FaustAvailability switch
+                {
+                    Settings.ModAvailability.On  => true,
+                    Settings.ModAvailability.Off => false,
+                    // "hidden until confirmed" — available ONLY once the `.faust api version` handshake
+                    // ACKs ready=1 (same model as Beelzebub/Uriel). Greyed on relog; lights up when THIS
+                    // server confirms Faust; recover via the inline Re-check or Connection → Re-detect.
+                    _ => Services.Faust.FaustProtocolService.IsPresent,
+                };
             case "Game UI":
                 return true; // standalone client-side enhancements; no server probe
             default:
@@ -1463,9 +1520,20 @@ public partial class MainPanel : ResizeablePanelBase
             && !Services.Uriel.UrielProtocolService.IsPresent;
     }
 
+    /// <summary>Faust analogue: in Auto mode, the `.faust api version` handshake gave up without a
+    /// ready ACK. Shows the inline "not detected — enable / re-check" panel under the Faust rail.</summary>
+    private static bool IsFaustDiagnosticState(string title)
+    {
+        if (title != "Faust") return false;
+        if (Settings.FaustAvailability != Settings.ModAvailability.Auto) return false;
+        return Services.Faust.FaustProtocolService.DetectionGaveUp
+            && !Services.Faust.FaustProtocolService.IsPresent;
+    }
+
     /// <summary>Any mod group can show an inline diagnostic when its Auto-mode handshake fails.</summary>
     private static bool IsModDiagnosticState(string title)
-        => IsBloodcraftDiagnosticState(title) || IsBeelzDiagnosticState(title) || IsUrielDiagnosticState(title);
+        => IsBloodcraftDiagnosticState(title) || IsBeelzDiagnosticState(title) || IsUrielDiagnosticState(title)
+        || IsFaustDiagnosticState(title);
 
     /// <summary>0.15.0: map each Bloodcraft tab to the Bloodcraft system that
     /// backs it. Returns null when the tab isn't tied to a single system
@@ -1505,6 +1573,22 @@ public partial class MainPanel : ResizeablePanelBase
         if (!_groupExpanded.TryGetValue(title, out var current)) return;
         _userToggledGroups.Add(title);   // F1: user took manual control — stop auto-defaulting this group
         var next = !current;
+
+        // Accordion (default ON): opening a group collapses every other group, so the left rail stays short
+        // on small screens. Players who prefer several sections open at once disable it in Display settings.
+        if (next && Config.Settings.LeftRailAccordion)
+        {
+            foreach (var other in new System.Collections.Generic.List<string>(_groupExpanded.Keys))
+            {
+                if (string.Equals(other, title, System.StringComparison.Ordinal)) continue;
+                if (_groupExpanded.TryGetValue(other, out var oc) && oc)   // only touch currently-open ones
+                {
+                    _userToggledGroups.Add(other);     // it was deliberately closed; don't auto-reopen it
+                    SetGroupExpandedState(other, false);
+                }
+            }
+        }
+
         _groupExpanded[title] = next;
         if (_groupContent.TryGetValue(title, out var go))
             go.SetActive(next);
@@ -1903,6 +1987,59 @@ public partial class MainPanel : ResizeablePanelBase
                 case PanelType.UrielModHelpTab:
                     BuildUrielModHelpTab(page);
                     break;
+                case PanelType.FaustCastleInfoTab:
+                    BuildFaustCastleInfoTab(page);
+                    break;
+                case PanelType.FaustPlotsTab:
+                    BuildFaustPlotsTab(page);
+                    break;
+                case PanelType.FaustAllPlotsTab:
+                    BuildFaustAllPlotsTab(page);
+                    break;
+                case PanelType.FaustDecayWatchTab:
+                    BuildFaustDecayWatchTab(page);
+                    break;
+                case PanelType.FaustResourcesTab:
+                    BuildFaustResourcesTab(page);
+                    break;
+                case PanelType.FaustPlayerInfoTab:
+                    BuildFaustPlayerInfoTab(page);
+                    break;
+                case PanelType.FaustClansTab:
+                    BuildFaustClansTab(page);
+                    break;
+                case PanelType.FaustPositionsTab:
+                    BuildFaustPositionsTab(page);
+                    break;
+                case PanelType.[redacted]:
+                    Build[redacted](page);
+                    break;
+                case PanelType.FaustStatsTab:
+                    BuildFaustStatsTab(page);
+                    break;
+                case PanelType.FaustSettingsTab:
+                    BuildFaustSettingsTab(page);
+                    break;
+                case PanelType.FaustAdminControlTab:
+                    BuildFaustAdminControlTab(page);
+                    break;
+                case PanelType.FaustAdminAccessTab:
+                    BuildFaustAdminAccessTab(page);
+                    break;
+                case PanelType.FaustAdminOversightTab:
+                    BuildFaustAdminOversightTab(page);
+                    break;
+                case PanelType.FaustQuickStartTab:
+                    // Combined "Faust Guide" tab — quick start followed by the full command/feature
+                    // reference (these used to be two tabs; merged because Faust is informational-only).
+                    BuildFaustQuickStartTab(page);
+                    AddSpacer(page, 8);
+                    BuildFaustModHelpTab(page);
+                    break;
+                case PanelType.FaustModHelpTab:
+                    // Retained for back-compat; no longer listed in TabGroups (folded into Faust Guide).
+                    BuildFaustModHelpTab(page);
+                    break;
                 default:
                     AddComingSoonBody(page, label);
                     break;
@@ -2006,65 +2143,80 @@ public partial class MainPanel : ResizeablePanelBase
         // the live chat window so the size change shows immediately.
         AddTextScaleRow(chatCard, "Chat text size",
             currentScaleSetting: () => Config.Settings.ChatTextScale,
-            applyScale: v => {
-                Config.Settings.SetChatTextScale(v);
-                Plugin.UIManager?.RefreshChatWindowOverlay();
-            });
-        AddChatOptionToggle(chatCard, "Newest message at the bottom (off = top)",
+            setScale: v => Config.Settings.SetChatTextScale(v),
+            rebuild: () => Plugin.UIManager?.RefreshChatWindowOverlay());
+        // ── Message display & format (own card) ────────────────────────────
+        var chatFmtCard = AddCard(page, "GameUIChatFmtCard");
+        AddSectionHeading(chatFmtCard, "Message display & format");
+        AddChatOptionToggle(chatFmtCard, "Newest message at the bottom (off = top)",
             Config.Settings.ChatNewestAtBottom,
             v => Config.Settings.SetChatNewestAtBottom(v));
-        AddChatOptionToggle(chatCard, "Auto-scroll to the newest message",
+        AddChatOptionToggle(chatFmtCard, "Auto-scroll to the newest message",
             Config.Settings.ChatAutoScroll,
             v => Config.Settings.SetChatAutoScroll(v));
-        AddChatOptionToggle(chatCard, "Spell out channel labels ([Global] instead of [G])",
+        // 0.50 r11: scrolling aids — clickable arrows (default on) + opt-in keyboard scrolling. Arrow keys are
+        // OFF by default because they commonly clash with gameplay binds; PageUp/PageDown are on by default.
+        AddChatOptionToggle(chatFmtCard, "Scroll arrows (↑ / ↓) on the chat scrollbar",
+            Config.Settings.ChatScrollArrowButtons,
+            v => Config.Settings.SetChatScrollArrowButtons(v));
+        AddChatOptionToggle(chatFmtCard, "Scroll the chat with PageUp / PageDown keys",
+            Config.Settings.ChatScrollPageKeys,
+            v => Config.Settings.SetChatScrollPageKeys(v));
+        AddChatOptionToggle(chatFmtCard, "Scroll the chat with Up / Down arrow keys (may clash with gameplay keys)",
+            Config.Settings.ChatScrollArrowKeys,
+            v => Config.Settings.SetChatScrollArrowKeys(v));
+        AddChatOptionToggle(chatFmtCard, "Spell out channel labels ([Global] instead of [G])",
             Config.Settings.ChatChannelLabelsSpelledOut,
             v => Config.Settings.SetChatChannelLabelsSpelledOut(v));
-        AddChatOptionToggle(chatCard, "Color tabs by channel",
+        AddChatOptionToggle(chatFmtCard, "Color tabs by channel",
             Config.Settings.ChatColorTabs,
             v => Config.Settings.SetChatColorTabs(v));
-        AddChatOptionToggle(chatCard, "Tabular layout (align time / channel+sender / message in columns)",
+        AddChatOptionToggle(chatFmtCard, "Tabular layout (align time / channel+sender / message in columns)",
             Config.Settings.ChatTabularLayout,
             v => Config.Settings.SetChatTabularLayout(v));
-        AddChatOptionToggle(chatCard, "    └ Separate channel and name into their own columns",
+        AddChatOptionToggle(chatFmtCard, "    └ Separate channel and name into their own columns",
             Config.Settings.ChatTabularSeparateChannelName,
             v => Config.Settings.SetChatTabularSeparateChannelName(v));
-        AddChatOptionToggle(chatCard, "    └ Auto-fit name column (off = fixed width; message column always grows first)",
+        AddChatOptionToggle(chatFmtCard, "    └ Auto-fit name column (off = fixed width; message column always grows first)",
             Config.Settings.ChatTabularAutoFitColumns,
             v => Config.Settings.SetChatTabularAutoFitColumns(v));
-        AddChatOptionToggle(chatCard, "Double-click a name in chat to whisper them",
+        AddChatOptionToggle(chatFmtCard, "Double-click a name in chat to whisper them",
             Config.Settings.ChatDoubleClickNameWhisper,
             v => Config.Settings.SetChatDoubleClickNameWhisper(v));
-        AddChatOptionToggle(chatCard, "On whispers you send, show who you sent it to",
+        AddChatOptionToggle(chatFmtCard, "On whispers you send, show who you sent it to",
             Config.Settings.ChatShowWhisperRecipient,
             v => Config.Settings.SetChatShowWhisperRecipient(v));
-        AddChatOptionToggle(chatCard, "    └ Recipient in the channel column ([Whisper → Name]); off = name column (→ Name)",
+        AddChatOptionToggle(chatFmtCard, "    └ Recipient in the channel column ([Whisper → Name]); off = name column (→ Name)",
             Config.Settings.ChatWhisperRecipientInChannelColumn,
             v => Config.Settings.SetChatWhisperRecipientInChannelColumn(v));
-        AddChatOptionToggle(chatCard, "Show a whisper to yourself as \"Note to self\" (off = whisper to your own name)",
+        AddChatOptionToggle(chatFmtCard, "Show a whisper to yourself as \"Note to self\" (off = whisper to your own name)",
             Config.Settings.ChatSelfWhisperAsNoteToSelf,
             v => Config.Settings.SetChatSelfWhisperAsNoteToSelf(v));
-        AddChatOptionToggle(chatCard, "Show \"missing class / expertise / legacy — free power\" hints (Class, Weapon, Blood pages + overlays)",
+        AddChatOptionToggle(chatFmtCard, "Show \"missing class / expertise / legacy — free power\" hints (Class, Weapon, Blood pages + overlays)",
             Config.Settings.ShowMissingElementHints,
             v => Config.Settings.SetShowMissingElementHints(v));
 
-        // 0.17.3: per-channel filter for the consolidated "All" tab. All default on
-        // (All shows everything). Unchecking a channel hides it from the All tab only
-        // — its own dedicated tab still shows it. AddChatOptionToggle re-renders live.
-        AddSectionHeading(chatCard, "Channels shown in the All tab");
-        AddChatOptionToggle(chatCard, "Global",   Config.Settings.AllTabShowGlobal,  v => Config.Settings.SetAllTabShowGlobal(v));
-        AddChatOptionToggle(chatCard, "Local",    Config.Settings.AllTabShowLocal,   v => Config.Settings.SetAllTabShowLocal(v));
-        AddChatOptionToggle(chatCard, "Clan",     Config.Settings.AllTabShowClan,    v => Config.Settings.SetAllTabShowClan(v));
-        AddChatOptionToggle(chatCard, "System",   Config.Settings.AllTabShowSystem,  v => Config.Settings.SetAllTabShowSystem(v));
-        AddChatOptionToggle(chatCard, "Whispers", Config.Settings.AllTabShowWhisper, v => Config.Settings.SetAllTabShowWhisper(v));
+        // ── Channels shown in the All tab (own card) ───────────────────────
+        // Unchecking a channel hides it from the All tab only — its own dedicated tab still shows it.
+        var allTabCard = AddCard(page, "GameUIChatAllTabCard");
+        AddSectionHeading(allTabCard, "Channels shown in the All tab");
+        AddChatOptionToggle(allTabCard, "Global",   Config.Settings.AllTabShowGlobal,  v => Config.Settings.SetAllTabShowGlobal(v));
+        AddChatOptionToggle(allTabCard, "Local",    Config.Settings.AllTabShowLocal,   v => Config.Settings.SetAllTabShowLocal(v));
+        AddChatOptionToggle(allTabCard, "Clan",     Config.Settings.AllTabShowClan,    v => Config.Settings.SetAllTabShowClan(v));
+        AddChatOptionToggle(allTabCard, "System",   Config.Settings.AllTabShowSystem,  v => Config.Settings.SetAllTabShowSystem(v));
+        AddChatOptionToggle(allTabCard, "Whispers", Config.Settings.AllTabShowWhisper, v => Config.Settings.SetAllTabShowWhisper(v));
+        AddChatOptionToggle(allTabCard, "Exclude notes to self from All (keep them only in the secondary window)",
+            Config.Settings.AllTabExcludeNotesToSelf, v => Config.Settings.SetAllTabExcludeNotesToSelf(v));
 
-        // 0.24: a SECOND, view-only chat window that mirrors only the channels ticked below — watch two
-        // streams at once (e.g. keep this one on Clan + System while the main window stays on Global).
-        AddSectionHeading(chatCard, "Secondary chat window (view-only)");
-        AddBodyText(chatCard,
+        // ── Secondary chat window (own card) ───────────────────────────────
+        // A SECOND, view-only window that mirrors only the channels ticked below — watch two streams at once.
+        var secondaryCard = AddCard(page, "GameUIChatSecondaryCard");
+        AddSectionHeading(secondaryCard, "Secondary chat window (view-only)");
+        AddBodyText(secondaryCard,
             "Open a second, draggable DISPLAY-ONLY window (no input box) that shows ONLY the channels you tick " +
             "below — handy for admins watching System / Clan apart from Global. Move/resize it like any overlay " +
             "(turn off \"Lock overlays\" first). It shares the chat window's text size, colors, and transparency.");
-        var secondaryChatBtn = UIFactory.CreateButton(chatCard, "ToggleSecondaryChatBtn", "Open / close secondary chat window");
+        var secondaryChatBtn = UIFactory.CreateButton(secondaryCard, "ToggleSecondaryChatBtn", "Open / close secondary chat window");
         UIFactory.SetLayoutElement(secondaryChatBtn.GameObject,
             minWidth: 200, preferredWidth: 280, flexibleWidth: 1, minHeight: 30, preferredHeight: 30, flexibleHeight: 0);
         secondaryChatBtn.OnClick = () =>
@@ -2073,22 +2225,25 @@ public partial class MainPanel : ResizeablePanelBase
             catch (System.Exception ex) { Utils.LogUtils.LogError($"Toggle secondary chat failed: {ex}"); }
         };
         TooltipHover.Attach(secondaryChatBtn.GameObject, "Show or hide the view-only secondary chat window.");
-        AddBodyText(chatCard, "<color=#9FD0FF>Channels shown in the secondary window:</color>");
+        AddBodyText(secondaryCard, "<color=#9FD0FF>Channels shown in the secondary window:</color>");
         void SecondaryChan(string label, bool val, System.Action<bool> set) =>
-            AddChatOptionToggle(chatCard, label, val, v => { set(v); Plugin.UIManager?.RefreshSecondaryChatOverlay(); });
+            AddChatOptionToggle(secondaryCard, label, val, v => { set(v); Plugin.UIManager?.RefreshSecondaryChatOverlay(); });
         SecondaryChan("Global",   Config.Settings.SecondaryChatShowGlobal,  Config.Settings.SetSecondaryChatShowGlobal);
         SecondaryChan("Local",    Config.Settings.SecondaryChatShowLocal,   Config.Settings.SetSecondaryChatShowLocal);
         SecondaryChan("Clan",     Config.Settings.SecondaryChatShowClan,    Config.Settings.SetSecondaryChatShowClan);
         SecondaryChan("System",   Config.Settings.SecondaryChatShowSystem,  Config.Settings.SetSecondaryChatShowSystem);
         SecondaryChan("Whispers", Config.Settings.SecondaryChatShowWhisper, Config.Settings.SetSecondaryChatShowWhisper);
+        SecondaryChan("Notes to self (only — whispers to your own character, separate from all whispers)",
+            Config.Settings.SecondaryChatShowNotesToSelf, Config.Settings.SetSecondaryChatShowNotesToSelf);
 
-        // 0.17.3: tab-switch hotkeys — <Modifier>+1..6 selects a tab while the chat
-        // window is open and you're not typing in it (1=All … 6=Whispers).
-        AddSectionHeading(chatCard, "Tab-switch hotkeys");
-        AddChatOptionToggle(chatCard, "Switch chat tabs with hotkeys (Modifier + 1-6, while chat is open & not typing)",
+        // ── Tab-switch hotkeys (own card) ──────────────────────────────────
+        // <Modifier>+1..6 selects a tab while the chat window is open and you're not typing (1=All … 6=Whispers).
+        var hotkeyCard = AddCard(page, "GameUIChatHotkeyCard");
+        AddSectionHeading(hotkeyCard, "Tab-switch hotkeys");
+        AddChatOptionToggle(hotkeyCard, "Switch chat tabs with hotkeys (Modifier + 1-6, while chat is open & not typing)",
             Config.Settings.ChatTabHotkeysEnabled,
             v => Config.Settings.SetChatTabHotkeysEnabled(v));
-        var modRow = UIFactory.CreateHorizontalGroup(chatCard, "ChatTabHotkeyModRow",
+        var modRow = UIFactory.CreateHorizontalGroup(hotkeyCard, "ChatTabHotkeyModRow",
             true, false, true, true, 6, new Vector4(2, 2, 2, 2));
         UIFactory.SetLayoutElement(modRow,
             minWidth: 200, preferredWidth: 280, flexibleWidth: 1, minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
@@ -2112,31 +2267,31 @@ public partial class MainPanel : ResizeablePanelBase
             TooltipHover.Attach(b.GameObject, $"Use {mm} + number keys 1-6 to switch chat tabs (1=All … 6=Whispers). The key isn't consumed, so pick a modifier that doesn't clash.");
         }
 
-        // Per-channel colors — each picker sets the color used for BOTH that channel's message text AND
-        // its tab (when "Color tabs by channel" is on). 0.21: all five are now user-settable + persisted
-        // (previously only Global was; Local/Clan/System/Whisper were fixed).
-        AddSectionHeading(chatCard, "Channel colors");
-        AddChatChannelColorRow(chatCard, "Global channel",  "Global",  Config.Settings.DEFAULT_CHAT_GLOBAL_HEX,  ApplyChatGlobalColorHex);
-        AddChatChannelColorRow(chatCard, "Local channel",   "Local",   Config.Settings.DEFAULT_CHAT_LOCAL_HEX,   ApplyChatLocalColorHex);
-        AddChatChannelColorRow(chatCard, "Clan channel",    "Clan",    Config.Settings.DEFAULT_CHAT_CLAN_HEX,    ApplyChatClanColorHex);
-        AddChatChannelColorRow(chatCard, "System messages", "System",  Config.Settings.DEFAULT_CHAT_SYSTEM_HEX,  ApplyChatSystemColorHex);
-        AddChatChannelColorRow(chatCard, "Whispers",        "Whisper", Config.Settings.DEFAULT_CHAT_WHISPER_HEX, ApplyChatWhisperColorHex);
-
-        // 0.21: extend the channel color to the message BODY (not just the [tag]/tab), and a distinct
-        // color for YOUR OWN messages so you can pick out your text on any tab.
-        AddChatOptionToggle(chatCard, "Color message text by channel color",
+        // ── Channel colors (own card) ──────────────────────────────────────
+        // Each picker sets the color used for BOTH that channel's message text AND its tab (when "Color tabs by
+        // channel" is on). All five are user-settable + persisted.
+        var colorCard = AddCard(page, "GameUIChatColorCard");
+        AddSectionHeading(colorCard, "Channel colors");
+        AddChatChannelColorRow(colorCard, "Global channel",  "Global",  Config.Settings.DEFAULT_CHAT_GLOBAL_HEX,  ApplyChatGlobalColorHex);
+        AddChatChannelColorRow(colorCard, "Local channel",   "Local",   Config.Settings.DEFAULT_CHAT_LOCAL_HEX,   ApplyChatLocalColorHex);
+        AddChatChannelColorRow(colorCard, "Clan channel",    "Clan",    Config.Settings.DEFAULT_CHAT_CLAN_HEX,    ApplyChatClanColorHex);
+        AddChatChannelColorRow(colorCard, "System messages", "System",  Config.Settings.DEFAULT_CHAT_SYSTEM_HEX,  ApplyChatSystemColorHex);
+        AddChatChannelColorRow(colorCard, "Whispers",        "Whisper", Config.Settings.DEFAULT_CHAT_WHISPER_HEX, ApplyChatWhisperColorHex);
+        // Extend the channel color to the message BODY (not just the [tag]/tab), and a distinct color for YOUR OWN messages.
+        AddChatOptionToggle(colorCard, "Color message text by channel color",
             Config.Settings.ChatColorMessageByChannel, Config.Settings.SetChatColorMessageByChannel);
-        AddChatOptionToggle(chatCard, "Highlight my own messages in a custom color",
+        AddChatOptionToggle(colorCard, "Highlight my own messages in a custom color",
             Config.Settings.ChatColorOwnMessages, Config.Settings.SetChatColorOwnMessages);
-        AddChatChannelColorRow(chatCard, "My messages", "Own", Config.Settings.DEFAULT_CHAT_OWN_HEX, ApplyChatOwnColorHex);
+        AddChatChannelColorRow(colorCard, "My messages", "Own", Config.Settings.DEFAULT_CHAT_OWN_HEX, ApplyChatOwnColorHex);
 
-        // Chat window background — transparency + theme color, independent of the
-        // other overlays / the main panel (same controls as Settings → Display).
-        AddSectionHeading(chatCard, "Chat window background");
-        AddTransparencyRow(chatCard, "Transparency",
+        // ── Chat window background (own card) ──────────────────────────────
+        // Transparency + theme color, independent of the other overlays / the main panel.
+        var bgCard = AddCard(page, "GameUIChatBgCard");
+        AddSectionHeading(bgCard, "Chat window background");
+        AddTransparencyRow(bgCard, "Transparency",
             () => Config.Settings.ChatWindowOverlayTransparency,
             v => Config.Settings.SetChatWindowOverlayTransparency(v));
-        AddPanelColorPresetRow(chatCard, "ChatBgPresetRow", ApplyChatWindowBgHex);
+        AddPanelColorPresetRow(bgCard, "ChatBgPresetRow", ApplyChatWindowBgHex);
     }
 
     // 0.17.0: persist the chat window's own background color + live-refresh it.
@@ -2662,7 +2817,7 @@ public partial class MainPanel : ResizeablePanelBase
             "", TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
         UIFactory.SetLayoutElement(_boxesSwapWarning.GameObject,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 38, preferredHeight: 38, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(38), preferredHeight: Theme.ScaledHeight(38), flexibleHeight: 0);
         _boxesSwapWarning.TextMesh.color = new Color(1f, 0.65f, 0.45f); // warm orange
         _boxesSwapWarning.TextMesh.enableWordWrapping = true;
         _boxesSwapWarning.TextMesh.overflowMode = TextOverflowModes.Overflow;
@@ -2675,7 +2830,7 @@ public partial class MainPanel : ResizeablePanelBase
         // button rows so auto-resize grows the panel for tall content.
         UIFactory.SetLayoutElement(_boxesContentContainer,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 60, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(60), flexibleHeight: 0);
 
         // ---- Edit-familiar forms (visible only when viewing a box's contents) ----
         AddSpacer(_boxesContentSection, 6);
@@ -2806,7 +2961,7 @@ public partial class MainPanel : ResizeablePanelBase
                 TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
             UIFactory.SetLayoutElement(empty.GameObject,
                 minWidth: 340, preferredWidth: 380, flexibleWidth: 1,
-                minHeight: 20, preferredHeight: 22, flexibleHeight: 0);
+                minHeight: Theme.ScaledHeight(20), preferredHeight: Theme.ScaledHeight(22), flexibleHeight: 0);
             empty.TextMesh.fontStyle = FontStyles.Italic;
             return;
         }
@@ -2818,7 +2973,7 @@ public partial class MainPanel : ResizeablePanelBase
                 TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
             UIFactory.SetLayoutElement(pending.GameObject,
                 minWidth: 340, preferredWidth: 380, flexibleWidth: 1,
-                minHeight: 20, preferredHeight: 22, flexibleHeight: 0);
+                minHeight: Theme.ScaledHeight(20), preferredHeight: Theme.ScaledHeight(22), flexibleHeight: 0);
             pending.TextMesh.fontStyle = FontStyles.Italic;
             return;
         }
@@ -2849,19 +3004,21 @@ public partial class MainPanel : ResizeablePanelBase
                     spacing: 4, padding: new Vector4(0, 0, 0, 0));
                 UIFactory.SetLayoutElement(row,
                     minWidth: 340, preferredWidth: 380, flexibleWidth: 1,
-                    minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+                    minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
 
                 var bindBtn = UIFactory.CreateButton(row, $"FamBtn_{entry.Index}", label);
                 UIFactory.SetLayoutElement(bindBtn.GameObject,
                     minWidth: 240, preferredWidth: 280, flexibleWidth: 1,
-                    minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+                    minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
+                var bindBtnTxt = bindBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
+                if (bindBtnTxt != null) bindBtnTxt.fontSize = Theme.ScaledUI(12);
                 bindBtn.OnClick = () => OnFamiliarClicked(idx);
 
                 var delBtn = UIFactory.CreateButton(row, $"FamDel_{entry.Index}", "Delete",
                     new Color(0.55f, 0.18f, 0.18f));
                 UIFactory.SetLayoutElement(delBtn.GameObject,
                     minWidth: 70, preferredWidth: 80, flexibleWidth: 0,
-                    minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+                    minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
                 var delText = delBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
                 if (delText != null) delText.fontSize = Theme.ScaledUI(12);
                 TooltipHover.Attach(delBtn.GameObject,
@@ -2874,7 +3031,9 @@ public partial class MainPanel : ResizeablePanelBase
                 var b = UIFactory.CreateButton(_boxesContentContainer, $"FamBtn_{entry.Index}", label);
                 UIFactory.SetLayoutElement(b.GameObject,
                     minWidth: 340, preferredWidth: 380, flexibleWidth: 1,
-                    minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+                    minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
+                var bTxt = b.Component.GetComponentInChildren<TextMeshProUGUI>();
+                if (bTxt != null) bTxt.fontSize = Theme.ScaledUI(12);
                 b.OnClick = () => OnFamiliarClicked(idx);
             }
         }
@@ -5536,9 +5695,13 @@ public partial class MainPanel : ResizeablePanelBase
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true,
             spacing: 6, padding: new Vector4(0, 0, 0, 0));
+        // 0.50: scale the row height with the UI font multiplier. AddCommandButton's
+        // buttons already grow via Theme.ScaledHeight(30); without scaling the row too,
+        // childControlHeight clamps the buttons back to a fixed 32px at Large+ text and
+        // the captions overflow into the row below (overlap on every Kindred tab).
         UIFactory.SetLayoutElement(row,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 32, preferredHeight: 32, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(32), preferredHeight: Theme.ScaledHeight(32), flexibleHeight: 0);
         return row;
     }
 
@@ -5852,6 +6015,32 @@ public partial class MainPanel : ResizeablePanelBase
             "call into odjit's mods.");
         AddLinkRow(page, "KindredCommands on Thunderstore",
             "https://thunderstore.io/c/v-rising/p/odjit/KindredCommands/");
+
+        // 0.50: also credit the companion server mods Raphael integrates beyond the two external
+        // mods above. Each of these powers its own tab group, which appears only when the mod is
+        // detected on your server.
+        AddSpacer(page, 10);
+        AddGuideSection(page, "",
+            "Raphael also integrates these companion server mods — each tab group lights up only when " +
+            "the matching mod is detected on your server:");
+
+        AddSpacer(page, 4);
+        AddGuideSection(page,
+            "Beelzebub  —  ability capture, loadouts & transforms",
+            "Powers the BEELZEBUB group: the bestiary of captured abilities, loadout / hotkey " +
+            "assignment, the ability action-bar overlay, and creature transforms.");
+
+        AddSpacer(page, 6);
+        AddGuideSection(page,
+            "Uriel  —  storage sharing, prisons, stairs & object spawning",
+            "Powers the URIEL group: client-side detection of nearby shared storage, public prisons, " +
+            "stair restyling, and the object-spawn palette plus admin spawn-condition config.");
+
+        AddSpacer(page, 6);
+        AddGuideSection(page,
+            "Faust  —  server investigation & analytics",
+            "Powers the FAUST group: castle / plot / decay reporting, player positions, server-stats " +
+            "charts, clan rosters, and the [redacted]s.");
         AddSpacer(page, 12);
 
         // ── Region 3 ─────────────────────────────────────────────────────
@@ -5914,124 +6103,103 @@ public partial class MainPanel : ResizeablePanelBase
         AddGuideSection(page,
             "Display settings",
             "Adjust text size and overlay transparency. " +
-            "Text-size changes apply when the panel is closed and reopened " +
-            "(or when an overlay is toggled off and back on). Transparency " +
+            "<b>Text size is now a slider</b> (50–400%, where 100% = the old \"Standard\") — drag it or type an " +
+            "exact value, then click <b>Apply</b> (it also takes effect when the panel/overlay is reopened). " +
+            "This replaces the old Small/Standard/Large/X-Large steps so you can dial in a size that fits your " +
+            "monitor or TV exactly, including much larger than the old X-Large. Transparency " +
             "changes apply immediately — drag the slider or type a 0–100 value. " +
             "0% transparency = solid background; 100% = fully invisible " +
             "background (the panel is still draggable and its text stays visible).");
 
-        AddTextScaleRow(page, "UI text size",
+        // ── Text & button size ─────────────────────────────────────────────
+        var sizeCard = AddCard(page, "SetCardTextSize");
+        AddSectionHeading(sizeCard, "Text & button size");
+        AddTextScaleRow(sizeCard, "UI text size",
             currentScaleSetting: () => Config.Settings.UITextScale,
-            applyScale: v => {
+            setScale: v => {
                 Config.Settings.SetUITextScale(v);
                 UI.Framework.CustomLib.Util.Theme.UIFontMultiplier = v;
-                // 0.9.2: rebuild the main panel so labels pick up the new
-                // multiplier. Deferred to next frame so this click handler
-                // completes before the panel hosting it is destroyed.
-                Plugin.UIManager.RequestRebuildMainPanel();
-            });
-
-        AddTextScaleRow(page, "Overlay text size",
+            },
+            // 0.9.2: rebuild the main panel so labels pick up the new multiplier. Deferred to next frame so
+            // the click handler completes before the panel hosting it is destroyed.
+            rebuild: () => Plugin.UIManager.RequestRebuildMainPanel());
+        AddTextScaleRow(sizeCard, "Overlay text size",
             currentScaleSetting: () => Config.Settings.OverlayTextScale,
-            applyScale: v => {
+            setScale: v => {
                 Config.Settings.SetOverlayTextScale(v);
                 UI.Framework.CustomLib.Util.Theme.OverlayFontMultiplier = v;
-                // 0.9.2: rebuild each overlay so its labels pick up the new
-                // multiplier. Only rebuilds overlays the user has enabled
-                // via the per-overlay toggles — disabled overlays stay
-                // un-constructed.
-                Plugin.UIManager.RequestRebuildAllOverlays();
-            });
-
+            },
+            // Rebuild each enabled overlay so its labels pick up the new multiplier.
+            rebuild: () => Plugin.UIManager.RequestRebuildAllOverlays());
         // 0.18.4: launcher (Raphael/OV) button size — some displays render them large.
-        AddLauncherButtonSizeRow(page);
+        AddLauncherButtonSizeRow(sizeCard);
 
-        AddSpacer(page, 4);
-        AddSectionHeading(page, "Overlay transparency");
-
-        AddTransparencyRow(page, "XP overlay",
+        // ── Overlay transparency ───────────────────────────────────────────
+        var transCard = AddCard(page, "SetCardTransparency");
+        AddSectionHeading(transCard, "Overlay transparency");
+        AddTransparencyRow(transCard, "XP overlay",
             () => Config.Settings.XPOverlayTransparency,
             v => Config.Settings.SetXPOverlayTransparency(v));
-        AddTransparencyRow(page, "Familiar overlay",
+        AddTransparencyRow(transCard, "Familiar overlay",
             () => Config.Settings.FamiliarOverlayTransparency,
             v => Config.Settings.SetFamiliarOverlayTransparency(v));
-        AddTransparencyRow(page, "Familiar Browser",
+        AddTransparencyRow(transCard, "Familiar Browser",
             () => Config.Settings.FamiliarBrowserTransparency,
             v => Config.Settings.SetFamiliarBrowserTransparency(v));
-        AddTransparencyRow(page, "Daily quest",
+        AddTransparencyRow(transCard, "Daily quest",
             () => Config.Settings.DailyQuestTransparency,
             v => Config.Settings.SetDailyQuestTransparency(v));
-        AddTransparencyRow(page, "Professions",
+        AddTransparencyRow(transCard, "Professions",
             () => Config.Settings.ProfessionOverlayTransparency,
             v => Config.Settings.SetProfessionOverlayTransparency(v));
         // 0.14.0: combined overlay transparency slider — same as the
         // standalone-overlay sliders above.
-        AddTransparencyRow(page, "Combined overlay",
+        AddTransparencyRow(transCard, "Combined overlay",
             () => Config.Settings.CombinedOverlayTransparency,
             v => Config.Settings.SetCombinedOverlayTransparency(v));
         // 0.19: Beelz summons overlay transparency.
-        AddTransparencyRow(page, "Beelz summons",
+        AddTransparencyRow(transCard, "Beelz summons",
             () => Config.Settings.BeelzSummonsOverlayTransparency,
             v => Config.Settings.SetBeelzSummonsOverlayTransparency(v));
         // 0.20: Beelz transforms overlay transparency.
-        AddTransparencyRow(page, "Beelz transforms",
+        AddTransparencyRow(transCard, "Beelz transforms",
             () => Config.Settings.BeelzTransformOverlayTransparency,
             v => Config.Settings.SetBeelzTransformOverlayTransparency(v));
 
-        AddSpacer(page, 8);
-        BuildCombinedOverlaySection(page);
+        // ── Colors & combined overlay (each its own titled card) ───────────
+        BuildCombinedOverlaySection(AddCard(page, "SetCardCombinedOverlay"));
+        BuildPanelBackgroundColorSection(AddCard(page, "SetCardPanelBg"));
+        BuildButtonColorSection(AddCard(page, "SetCardButtonColor"));
 
-        AddSpacer(page, 8);
-        BuildPanelBackgroundColorSection(page);
+        // ── HUD extras ─────────────────────────────────────────────────────
+        var hudCard = AddCard(page, "SetCardHUDExtras");
+        AddSectionHeading(hudCard, "HUD extras");
+        AddShowProgressBarsToggle(hudCard);
+        AddShowOverlayBonusStatsToggle(hudCard);
+        AddShowOverlayStatAcronymsToggle(hudCard);
+        AddShowOverlayXpCounterToggle(hudCard);
+        AddProgressBarHeightControls(hudCard);
+        AddOverlayEdgePaddingControls(hudCard);
+        AddShowPrestigeSubLineToggle(hudCard);
+        AddOverlaysBehindMenusToggle(hudCard);
+        AddSuppressInputToggle(hudCard);
+        AddBlockInputOverUiToggle(hudCard);
+        AddOverlayAlignmentToggle(hudCard);
+        AddAutoScanVBloodsToggle(hudCard);
 
-        AddSpacer(page, 8);
-        BuildButtonColorSection(page);
-
-        AddSpacer(page, 8);
-        AddSectionHeading(page, "HUD extras");
-        AddShowProgressBarsToggle(page);
-        AddShowOverlayBonusStatsToggle(page);
-        AddShowOverlayStatAcronymsToggle(page);
-        AddShowOverlayXpCounterToggle(page);
-        AddProgressBarHeightControls(page);
-        AddOverlayEdgePaddingControls(page);
-        AddShowPrestigeSubLineToggle(page);
-        AddOverlaysBehindMenusToggle(page);
-        AddSuppressInputToggle(page);
-        AddBlockInputOverUiToggle(page);
-        AddOverlayAlignmentToggle(page);
-        AddAutoScanVBloodsToggle(page);
-
-        AddSpacer(page, 6);
-        BuildProfessionTrackedSection(page);
-
-        AddSpacer(page, 8);
-        // 0.18: all chat-suppression controls consolidated into one "Chat noise" section
-        // (was split with the separate "Chat Logging" section below). See BuildChatNoiseSection.
-        BuildChatNoiseSection(page);
-        AddSpacer(page, 8);
-        // 0.9.7: per-component size adjustment + reset-to-default controls.
-        BuildSizePositioningSection(page);
-        // 0.18: the old "Chat Logging" section + its 3 Show* category toggles + Show/Hide-All
-        // buttons were merged into the consolidated "Chat noise" section above
-        // (BuildChatNoiseSection). The underlying ShowChat* config keys are preserved.
-
-        AddSpacer(page, 8);
-        // 0.18: Beelzebub tab-group availability (Auto/On/Off). Lives here on the
-        // always-reachable global Settings tab — never inside the Beelzebub group it
-        // can hide (that would lock the user out of the control).
-        BuildBeelzAvailabilityGlobalSetting(page);
-
-        AddSpacer(page, 8);
-        // 0.28: master overlay-hide options (Toggle vs Timed, hide the launcher buttons too, keep the
-        // game chat hidden). Sits just above Hotkeys because it pairs with the "Toggle all overlays"
-        // bind there.
-        BuildOverlayVisibilitySection(page);
-
-        AddSpacer(page, 8);
-        // 0.15.0: optional keyboard hotkeys for the floating Raphael / OV button
-        // actions + diagnostic mode toggle. Both opt-in.
-        BuildHotkeysSection(page);
+        // ── Remaining sections — each wrapped in its own card so the page reads
+        //    as discrete grouped boxes instead of one long flat scroll of toggles.
+        BuildProfessionTrackedSection(AddCard(page, "SetCardProfessions"));
+        // Chat-suppression controls (consolidated "Chat noise" section).
+        BuildChatNoiseSection(AddCard(page, "SetCardChatNoise"));
+        // Per-component size adjustment + reset-to-default controls.
+        BuildSizePositioningSection(AddCard(page, "SetCardSizePos"));
+        // Beelzebub tab-group availability (Auto/On/Off) — lives on the always-reachable Settings tab.
+        BuildBeelzAvailabilityGlobalSetting(AddCard(page, "SetCardBeelzAvail"));
+        // Master overlay-hide options (Toggle vs Timed, hide launcher, chat-with-OV) — pairs with the Hotkeys bind.
+        BuildOverlayVisibilitySection(AddCard(page, "SetCardOverlayVis"));
+        // Optional keyboard hotkeys for the floating Raphael / OV buttons + diagnostic mode.
+        BuildHotkeysSection(AddCard(page, "SetCardHotkeys"));
     }
 
     // 0.28: "Overlay Visibility" — shapes what the OV button / the "Toggle all overlays" hotkey do.
@@ -6057,14 +6225,14 @@ public partial class MainPanel : ResizeablePanelBase
             minHeight: 30, preferredHeight: 32, flexibleHeight: 0);
 
         var modeLbl = UIFactory.CreateLabel(modeRow, "Lbl_OVHideMode", "Hide mode:",
-            TextAlignmentOptions.MidlineLeft, color: null, fontSize: 13);
+            TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(13));
         UIFactory.SetLayoutElement(modeLbl.GameObject,
-            minWidth: 90, preferredWidth: 100, flexibleWidth: 0,
+            minWidth: Theme.ScaledWidth(90), preferredWidth: Theme.ScaledWidth(100), flexibleWidth: 0,
             minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
 
         var modeHint = UIFactory.CreateLabel(modeRow, "Hint_OVHideMode",
             FormatOVHideModeHint(),
-            TextAlignmentOptions.MidlineLeft, color: null, fontSize: 11);
+            TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
         UIFactory.SetLayoutElement(modeHint.GameObject,
             minWidth: 150, preferredWidth: 180, flexibleWidth: 1,
             minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
@@ -6093,16 +6261,16 @@ public partial class MainPanel : ResizeablePanelBase
             minHeight: 30, preferredHeight: 32, flexibleHeight: 0);
 
         var durLbl = UIFactory.CreateLabel(durRow, "Lbl_OVHideDuration", "Timed duration:",
-            TextAlignmentOptions.MidlineLeft, color: null, fontSize: 13);
+            TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(13));
         UIFactory.SetLayoutElement(durLbl.GameObject,
-            minWidth: 100, preferredWidth: 110, flexibleWidth: 0,
+            minWidth: Theme.ScaledWidth(100), preferredWidth: Theme.ScaledWidth(110), flexibleWidth: 0,
             minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
 
         var durHint = UIFactory.CreateLabel(durRow, "Hint_OVHideDuration",
             FormatOVHideDurationHint(),
-            TextAlignmentOptions.MidlineLeft, color: null, fontSize: 11);
+            TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
         UIFactory.SetLayoutElement(durHint.GameObject,
-            minWidth: 70, preferredWidth: 80, flexibleWidth: 0,
+            minWidth: Theme.ScaledWidth(70), preferredWidth: Theme.ScaledWidth(80), flexibleWidth: 0,
             minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
         durHint.TextMesh.fontStyle = FontStyles.Italic;
 
@@ -6128,7 +6296,7 @@ public partial class MainPanel : ResizeablePanelBase
         // Live gate warning — shown only when the user has asked to hide the buttons but neither escape
         // route (timed mode / bound hotkey) exists, so the setting is currently being ignored for safety.
         var gateWarn = UIFactory.CreateLabel(page, "OVHideGateWarning", "",
-            TextAlignmentOptions.TopLeft, color: null, fontSize: 11);
+            TextAlignmentOptions.TopLeft, color: null, fontSize: Theme.ScaledUI(11));
         UIFactory.SetLayoutElement(gateWarn.GameObject,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
             minHeight: 18, preferredHeight: 34, flexibleHeight: 0);
@@ -6152,13 +6320,23 @@ public partial class MainPanel : ResizeablePanelBase
         };
         refreshGateWarning();
 
-        // ── Keep game chat hidden during a hide ─────────────────────────────
-        AddOverlayVisToggle(page, "Keep game chat hidden while hidden",
+        // ── Chat ↔ master overlay-hide (OV) ─────────────────────────────────
+        // Master switch (same setting as the "Hide chat with OV" footer toggle) — surfaced here too so it's
+        // findable in Settings. When OFF (default), the OV hide never touches chat (game chat OR Raphael chat).
+        AddOverlayVisToggle(page, "Hide chat when hiding overlays (OV)",
+            Config.Settings.HideChatWithOverlaysToggle,
+            "When ON, the master 'hide all overlays' (OV button / hotkey) ALSO hides the chat — both Raphael's " +
+            "chat window and the game's native chat. Default OFF, so chat stays visible while the other overlays " +
+            "hide. (Same setting as 'Hide chat with OV' on the main panel footer.) The toggle below then decides " +
+            "whether the GAME chat comes back or stays hidden during the hide.",
+            v => { Config.Settings.SetHideChatWithOverlaysToggle(v); Plugin.UIManager?.ApplyNativeChatVisibility(); });
+        AddOverlayVisToggle(page, "↳ Keep GAME chat hidden too (else it returns)",
             Config.Settings.KeepNativeChatHiddenWhileOverlaysHidden,
-            "Only applies when 'Hide chat with OV' (on the main panel footer) is on. ON (default) keeps the " +
-            "game's native chat hidden during a master hide for a clean screen, instead of letting it pop " +
-            "back up. Turn OFF if you'd rather still have the game chat available while Raphael overlays are hidden.",
-            v => Config.Settings.SetKeepNativeChatHiddenWhileOverlaysHidden(v));
+            "Only applies when 'Hide chat when hiding overlays' (above) is on. ON (default) keeps the game's " +
+            "native chat hidden during a master hide for a clean screen. Turn OFF if you'd rather the game chat " +
+            "stay/return visible while Raphael overlays are hidden — e.g. if you use the game's own chat and not " +
+            "Raphael's chat window.",
+            v => { Config.Settings.SetKeepNativeChatHiddenWhileOverlaysHidden(v); Plugin.UIManager?.ApplyNativeChatVisibility(); });
     }
 
     private static string FormatOVHideModeHint()
@@ -6618,6 +6796,23 @@ public partial class MainPanel : ResizeablePanelBase
                 SaveInternalData();
             });
 
+        // Left-rail accordion toggle — collapse other groups when one opens (keeps the rail short on small
+        // screens). Lives here under Primary UI sizing because it's a "the rail is too tall" remedy.
+        var accToggle = UIFactory.CreateToggle(page, "LeftRailAccordionToggle");
+        UIFactory.SetLayoutElement(accToggle.GameObject,
+            minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
+            minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
+        accToggle.Text.text = "Accordion left rail (collapse other groups when one opens)";
+        accToggle.Text.fontSize = Theme.ScaledUI(13);
+        accToggle.Text.alignment = TextAlignmentOptions.MidlineLeft;
+        accToggle.Text.enableWordWrapping = true;
+        accToggle.Toggle.isOn = Config.Settings.LeftRailAccordion;
+        accToggle.OnValueChanged += v => Config.Settings.SetLeftRailAccordion(v);
+        TooltipHover.Attach(accToggle.GameObject,
+            "ON (default): expanding one left-rail group (Bloodcraft / Beelzebub / Kindred / Uriel / Faust / " +
+            "Settings & Help) collapses the others, so the rail stays short on small screens. OFF: keep several " +
+            "groups expanded at once.");
+
         // Width + Height step rows
         AddSizePosStepRow(page, "Width",
             () => Rect != null ? (int)Rect.sizeDelta.x : 0,
@@ -6784,7 +6979,7 @@ public partial class MainPanel : ResizeablePanelBase
             spacing: 4, padding: new Vector4(2, 2, 2, 2));
         UIFactory.SetLayoutElement(row,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
 
         AddProgressBarSystemToggle(row, "XP",          () => Config.Settings.ShowProgressBarXP,          Config.Settings.SetShowProgressBarXP);
         AddProgressBarSystemToggle(row, "Familiar",    () => Config.Settings.ShowProgressBarFamiliar,    Config.Settings.SetShowProgressBarFamiliar);
@@ -6799,7 +6994,7 @@ public partial class MainPanel : ResizeablePanelBase
         var t = UIFactory.CreateToggle(row, $"BarSys_{label}");
         UIFactory.SetLayoutElement(t.GameObject,
             minWidth: 70, preferredWidth: 80, flexibleWidth: 1,
-            minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         t.Text.text = label;
         t.Text.fontSize = Theme.ScaledUI(11);
         t.Text.alignment = TextAlignmentOptions.MidlineLeft;
@@ -6807,7 +7002,7 @@ public partial class MainPanel : ResizeablePanelBase
         t.Text.overflowMode = TextOverflowModes.Overflow;
         UIFactory.SetLayoutElement(t.Text.gameObject,
             minWidth: 50, preferredWidth: 65, flexibleWidth: 1,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         t.Toggle.isOn = get();
         TooltipHover.Attach(t.GameObject,
             $"Show the progress bar for {label} in BOTH the standalone overlay and the combined overlay. Applies wherever the system renders.");
@@ -6836,18 +7031,18 @@ public partial class MainPanel : ResizeablePanelBase
             spacing: 6, padding: new Vector4(2, 2, 2, 2));
         UIFactory.SetLayoutElement(row,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
 
         var t = UIFactory.CreateToggle(row, "ShowOverlayBonusStatsToggle");
         UIFactory.SetLayoutElement(t.GameObject,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         t.Text.text = "Show weapon expertise & blood legacy bonus stats on the XP overlay";
         t.Text.fontSize = Theme.ScaledUI(12);
         t.Text.alignment = TextAlignmentOptions.MidlineLeft;
         UIFactory.SetLayoutElement(t.Text.gameObject,
             minWidth: 320, preferredWidth: 360, flexibleWidth: 1,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         t.Toggle.isOn = Config.Settings.ShowOverlayBonusStats;
         TooltipHover.Attach(t.GameObject,
             "When on, the XP overlay shows the chosen bonus-stat names AND their current numeric values under the Weapon and Legacy rows (e.g. '+12.5% PhysicalPower'). Auto-fetches .wep get and .bl get every 10s while the overlay is visible. Off by default for a minimal HUD.");
@@ -7118,10 +7313,15 @@ public partial class MainPanel : ResizeablePanelBase
             TextAlignmentOptions.TopLeft, color: null, fontSize: Theme.ScaledUI(14));
         UIFactory.SetLayoutElement(help.GameObject,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 32, preferredHeight: 56, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(32), flexibleHeight: 0);
         help.TextMesh.enableWordWrapping = true;
         help.TextMesh.overflowMode = TextOverflowModes.Overflow;
         help.TextMesh.fontStyle = FontStyles.Italic;
+        // 0.50: ContentSizeFitter so this wrapped subtext grows with the font scale
+        // instead of clipping under the "Use combined overlay" toggle at Large+ text.
+        var helpFitter = help.GameObject.AddComponent<UnityEngine.UI.ContentSizeFitter>();
+        helpFitter.horizontalFit = UnityEngine.UI.ContentSizeFitter.FitMode.Unconstrained;
+        helpFitter.verticalFit   = UnityEngine.UI.ContentSizeFitter.FitMode.PreferredSize;
 
         // Master toggle.
         var masterRow = UIFactory.CreateHorizontalGroup(page, "CombinedMasterRow",
@@ -7130,18 +7330,18 @@ public partial class MainPanel : ResizeablePanelBase
             spacing: 6, padding: new Vector4(2, 2, 2, 2));
         UIFactory.SetLayoutElement(masterRow,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
 
         var masterT = UIFactory.CreateToggle(masterRow, "CombinedMasterToggle");
         UIFactory.SetLayoutElement(masterT.GameObject,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         masterT.Text.text = "Use combined overlay (hides individual info overlays)";
         masterT.Text.fontSize = Theme.ScaledUI(13);
         masterT.Text.alignment = TextAlignmentOptions.MidlineLeft;
         UIFactory.SetLayoutElement(masterT.Text.gameObject,
             minWidth: 320, preferredWidth: 360, flexibleWidth: 1,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         masterT.Toggle.isOn = Config.Settings.ShowCombinedOverlay;
         _combinedMasterToggle = masterT.Toggle; // track for footer-click sync
         TooltipHover.Attach(masterT.GameObject,
@@ -7170,7 +7370,7 @@ public partial class MainPanel : ResizeablePanelBase
             spacing: 4, padding: new Vector4(2, 2, 2, 2));
         UIFactory.SetLayoutElement(row1,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         // 0.14.0 friend-test v2: per-component checkboxes now write the SAME
         // Settings.Show*Overlay flags that the footer toggles use. Both UI
         // surfaces stay in sync because both read/write the same setting —
@@ -7188,7 +7388,7 @@ public partial class MainPanel : ResizeablePanelBase
             spacing: 4, padding: new Vector4(2, 2, 2, 2));
         UIFactory.SetLayoutElement(row2,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(28), preferredHeight: Theme.ScaledHeight(30), flexibleHeight: 0);
         AddCombinedSectionToggle(row2, "Blood",        () => Config.Settings.CombinedOverlayShowLegacy, Config.Settings.SetCombinedOverlayShowLegacy);
         AddCombinedSectionToggleUnified(row2, "Professions", () => Config.Settings.ShowProfessionOverlay, Config.Settings.SetShowProfessionOverlay);
         AddCombinedSectionToggleUnified(row2, "Quests",      () => Config.Settings.ShowDailyQuestOverlay, Config.Settings.SetShowDailyQuestOverlay);
@@ -7209,7 +7409,7 @@ public partial class MainPanel : ResizeablePanelBase
         var t = UIFactory.CreateToggle(row, $"CombinedSec_{label}");
         UIFactory.SetLayoutElement(t.GameObject,
             minWidth: 110, preferredWidth: 130, flexibleWidth: 1,
-            minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         t.Text.text = label;
         t.Text.fontSize = Theme.ScaledUI(12);
         t.Text.alignment = TextAlignmentOptions.MidlineLeft;
@@ -7217,7 +7417,7 @@ public partial class MainPanel : ResizeablePanelBase
         t.Text.overflowMode = TextOverflowModes.Overflow;
         UIFactory.SetLayoutElement(t.Text.gameObject,
             minWidth: 80, preferredWidth: 100, flexibleWidth: 1,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         t.Toggle.isOn = get();
         TooltipHover.Attach(t.GameObject,
             $"Show the {label} system — affects BOTH the standalone {label} overlay AND the corresponding section in the combined overlay. One flag controls both views.");
@@ -7257,7 +7457,7 @@ public partial class MainPanel : ResizeablePanelBase
         var t = UIFactory.CreateToggle(row, $"CombinedSec_{label}");
         UIFactory.SetLayoutElement(t.GameObject,
             minWidth: 110, preferredWidth: 130, flexibleWidth: 1,
-            minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(24), preferredHeight: Theme.ScaledHeight(26), flexibleHeight: 0);
         t.Text.text = label;
         t.Text.fontSize = Theme.ScaledUI(12);
         t.Text.alignment = TextAlignmentOptions.MidlineLeft;
@@ -7265,7 +7465,7 @@ public partial class MainPanel : ResizeablePanelBase
         t.Text.overflowMode = TextOverflowModes.Overflow;
         UIFactory.SetLayoutElement(t.Text.gameObject,
             minWidth: 80, preferredWidth: 100, flexibleWidth: 1,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
         t.Toggle.isOn = get();
         TooltipHover.Attach(t.GameObject,
             $"Show the {label} section inside the combined overlay. No effect when combined-mode is off.");
@@ -7624,63 +7824,97 @@ public partial class MainPanel : ResizeablePanelBase
         };
     }
 
-    /// <summary>Renders a labeled row with three buttons (Small/Standard/Large).
-    /// Each click writes the new multiplier and refreshes the in-row "(current: X)"
-    /// hint so the user can confirm.</summary>
+    /// <summary>Font-size control: a slider (50–400%) + a typed value box + Apply, replacing the old
+    /// Small/Standard/Large/X-Large buttons so users can dial in an exact size for their monitor/TV (where the
+    /// old fixed steps looked drastically off). Dragging the slider or typing a value stores it live; Apply (or
+    /// reopening the panel) rebuilds so existing labels pick up the new size. 100% = the old "Standard".</summary>
     private void AddTextScaleRow(GameObject parent, string label,
                                  System.Func<float> currentScaleSetting,
-                                 System.Action<float> applyScale)
+                                 System.Action<float> setScale,
+                                 System.Action rebuild)
     {
-        var row = UIFactory.CreateHorizontalGroup(parent, $"DisplayRow_{label}",
+        const int MINPCT = 50, MAXPCT = 400;
+
+        var row = UIFactory.CreateHorizontalGroup(parent, $"FontScaleRow_{label}",
             forceExpandWidth: true, forceExpandHeight: false,
             childControlWidth: true, childControlHeight: true,
             spacing: 6, padding: new Vector4(2, 2, 2, 2));
         UIFactory.SetLayoutElement(row,
             minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
-            minHeight: 30, preferredHeight: 32, flexibleHeight: 0);
+            minHeight: 28, preferredHeight: 30, flexibleHeight: 0);
 
-        var lbl = UIFactory.CreateLabel(row, $"Lbl_{label}",
-            $"{label}:",
-            TMPro.TextAlignmentOptions.MidlineLeft, color: null, fontSize: 13);
+        var lbl = UIFactory.CreateLabel(row, $"FsLbl_{label}", $"{label}:",
+            TMPro.TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
         UIFactory.SetLayoutElement(lbl.GameObject,
-            minWidth: 140, preferredWidth: 160, flexibleWidth: 0,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            minWidth: Theme.ScaledWidth(120), preferredWidth: Theme.ScaledWidth(140), flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
 
-        var hint = UIFactory.CreateLabel(row, $"Hint_{label}",
-            FormatScaleHint(currentScaleSetting()),
-            TMPro.TextAlignmentOptions.MidlineLeft, color: null, fontSize: 11);
-        UIFactory.SetLayoutElement(hint.GameObject,
-            minWidth: 90, preferredWidth: 100, flexibleWidth: 0,
-            minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
-        hint.TextMesh.fontStyle = TMPro.FontStyles.Italic;
+        int startPct = Mathf.Clamp(Mathf.RoundToInt(currentScaleSetting() * 100f), MINPCT, MAXPCT);
 
-        void Pick(float v)
+        var sliderGo = UIFactory.CreateSlider(row, $"FsSlider_{label}", out var slider);
+        UIFactory.SetLayoutElement(sliderGo,
+            minWidth: 110, preferredWidth: 160, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        slider.minValue = MINPCT; slider.maxValue = MAXPCT; slider.wholeNumbers = true; slider.value = startPct;
+
+        var gap = UIFactory.CreateUIObject($"FsGap_{label}", row);
+        UIFactory.SetLayoutElement(gap, minWidth: 10, preferredWidth: 10, flexibleWidth: 0, minHeight: 10, preferredHeight: 10, flexibleHeight: 0);
+
+        var box = UIFactory.CreateInputField(row, $"FsInput_{label}", "100");
+        UIFactory.SetLayoutElement(box.GameObject,
+            minWidth: 48, preferredWidth: 52, flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        box.Component.contentType = TMPro.TMP_InputField.ContentType.IntegerNumber;
+        box.Component.characterLimit = 3;
+        box.Text = startPct.ToString();
+
+        var pctLbl = UIFactory.CreateLabel(row, $"FsPct_{label}", "%",
+            TMPro.TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
+        UIFactory.SetLayoutElement(pctLbl.GameObject,
+            minWidth: Theme.ScaledWidth(14), preferredWidth: Theme.ScaledWidth(16), flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+
+        var applyBtn = UIFactory.CreateButton(row, $"FsApply_{label}", "Apply");
+        UIFactory.SetLayoutElement(applyBtn.GameObject,
+            minWidth: Theme.ScaledWidth(60), preferredWidth: Theme.ScaledWidth(64), flexibleWidth: 0, minHeight: 24, preferredHeight: 26, flexibleHeight: 0);
+        { var t = applyBtn.Component.GetComponentInChildren<TextMeshProUGUI>(); if (t != null) t.fontSize = Theme.ScaledUI(11); }
+
+        bool syncing = false;
+        void StoreLive(int pct) => setScale(Mathf.Clamp(pct, MINPCT, MAXPCT) / 100f);
+
+        // Slider drag previews the value + stores it live, but does NOT rebuild on every tick (that would
+        // destroy the slider mid-drag). The user commits with Apply (or by typing + Enter), or it takes effect
+        // next time the panel/overlay is (re)opened.
+        System.Action<float> onSlider = v =>
         {
-            applyScale(v);
-            hint.TextMesh.text = FormatScaleHint(v);
-        }
-        AddScaleButton(row, "Small",    () => Pick(0.85f));
-        AddScaleButton(row, "Standard", () => Pick(1.00f));
-        AddScaleButton(row, "Large",    () => Pick(1.20f));
-        AddScaleButton(row, "X-Large",  () => Pick(1.50f));
+            if (syncing) return; syncing = true;
+            int pct = Mathf.Clamp(Mathf.RoundToInt(v), MINPCT, MAXPCT);
+            box.Text = pct.ToString();
+            StoreLive(pct);
+            syncing = false;
+        };
+        System.Action<string> onBox = s =>
+        {
+            if (syncing) return; syncing = true;
+            if (!int.TryParse(s, out int pct)) pct = Mathf.RoundToInt(currentScaleSetting() * 100f);
+            pct = Mathf.Clamp(pct, MINPCT, MAXPCT);
+            box.Text = pct.ToString();
+            slider.value = pct;
+            StoreLive(pct);
+            syncing = false;
+            rebuild();   // committing a typed value applies it immediately
+        };
+        slider.onValueChanged.AddListener(onSlider);
+        box.Component.onEndEdit.AddListener(onBox);
+        applyBtn.OnClick = () => { StoreLive(Mathf.Clamp(Mathf.RoundToInt(slider.value), MINPCT, MAXPCT)); rebuild(); };
     }
 
-    private static string FormatScaleHint(float v)
-    {
-        if (v <= 0.9f)  return "(current: Small)";
-        if (v >= 1.35f) return "(current: X-Large)";
-        if (v >= 1.1f)  return "(current: Large)";
-        return "(current: Standard)";
-    }
-
+    // Small segmented-control button used by various labeled choice rows. (Formerly also drove the text-size
+    // row, which is now a slider; kept here because other rows still use it.)
     private static void AddScaleButton(GameObject row, string text, System.Action onClick)
     {
         var btn = UIFactory.CreateButton(row, $"Btn_{text}", text);
         UIFactory.SetLayoutElement(btn.GameObject,
-            minWidth: 64, preferredWidth: 72, flexibleWidth: 0,
+            minWidth: Theme.ScaledWidth(64), preferredWidth: Theme.ScaledWidth(72), flexibleWidth: 0,
             minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
         var t = btn.Component.GetComponentInChildren<TextMeshProUGUI>();
-        if (t != null) t.fontSize = 11;
+        if (t != null) t.fontSize = Theme.ScaledUI(11);
         btn.OnClick = () => onClick();
     }
 
@@ -7703,9 +7937,9 @@ public partial class MainPanel : ResizeablePanelBase
 
         var lbl = UIFactory.CreateLabel(row, $"Lbl_{overlayLabel}",
             $"{overlayLabel}:",
-            TMPro.TextAlignmentOptions.MidlineLeft, color: null, fontSize: 12);
+            TMPro.TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
         UIFactory.SetLayoutElement(lbl.GameObject,
-            minWidth: 130, preferredWidth: 150, flexibleWidth: 0,
+            minWidth: Theme.ScaledWidth(130), preferredWidth: Theme.ScaledWidth(150), flexibleWidth: 0,
             minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
 
         int startPct = Mathf.Clamp(Mathf.RoundToInt(currentValue() * 100f), 0, 100);
@@ -7734,9 +7968,9 @@ public partial class MainPanel : ResizeablePanelBase
         box.Text = startPct.ToString();
 
         var pctLbl = UIFactory.CreateLabel(row, $"OpacityPct_{overlayLabel}", "%",
-            TMPro.TextAlignmentOptions.MidlineLeft, color: null, fontSize: 12);
+            TMPro.TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
         UIFactory.SetLayoutElement(pctLbl.GameObject,
-            minWidth: 14, preferredWidth: 16, flexibleWidth: 0,
+            minWidth: Theme.ScaledWidth(14), preferredWidth: Theme.ScaledWidth(16), flexibleWidth: 0,
             minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
 
         // Re-entry guard so slider→box and box→slider mirroring doesn't recurse.
@@ -8028,16 +8262,16 @@ public partial class MainPanel : ResizeablePanelBase
             minHeight: 30, preferredHeight: 32, flexibleHeight: 0);
 
         var lbl = UIFactory.CreateLabel(row, "Lbl_LauncherSize", "Launcher button size:",
-            TextAlignmentOptions.MidlineLeft, color: null, fontSize: 13);
+            TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(13));
         UIFactory.SetLayoutElement(lbl.GameObject,
-            minWidth: 140, preferredWidth: 160, flexibleWidth: 0,
+            minWidth: Theme.ScaledWidth(140), preferredWidth: Theme.ScaledWidth(160), flexibleWidth: 0,
             minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
 
         var hint = UIFactory.CreateLabel(row, "Hint_LauncherSize",
             FormatLauncherSizeHint(Config.Settings.FloatingButtonScale),
-            TextAlignmentOptions.MidlineLeft, color: null, fontSize: 11);
+            TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
         UIFactory.SetLayoutElement(hint.GameObject,
-            minWidth: 80, preferredWidth: 90, flexibleWidth: 0,
+            minWidth: Theme.ScaledWidth(80), preferredWidth: Theme.ScaledWidth(90), flexibleWidth: 0,
             minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
         hint.TextMesh.fontStyle = FontStyles.Italic;
 
@@ -9703,11 +9937,14 @@ public partial class MainPanel : ResizeablePanelBase
             Services.Beelzebub.BeelzState.PresenceChanged -= OnBloodcraftAvailabilityChanged;   // 0.24.7: matches the subscribe above
             Services.Uriel.UrielProtocolService.AvailabilityChanged -= OnBloodcraftAvailabilityChanged;   // 0.26: matches the subscribe above
             Services.Uriel.UrielState.PresenceChanged -= OnBloodcraftAvailabilityChanged;
+            Services.Faust.FaustProtocolService.AvailabilityChanged -= OnBloodcraftAvailabilityChanged;   // matches the subscribe above
+            Services.Faust.FaustState.PresenceChanged -= OnBloodcraftAvailabilityChanged;
             _availabilitySubscribed = false;
         }
         _userToggledGroups.Clear(); // F1: next server re-applies the detection-based default expansion
         UnsubscribeBeelz(); // 0.18: drop BeelzState handlers so they don't leak across rebuilds
         UnsubscribeUriel(); // 0.26: same, for UrielState handlers
+        UnsubscribeFaust(); // drop FaustState handlers so they don't leak across rebuilds
         if (_deferredAvailabilityRefresh != null)
         {
             Raphael.Behaviors.CoreUpdateBehavior.Actions.Remove(_deferredAvailabilityRefresh);
