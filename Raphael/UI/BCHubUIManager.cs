@@ -528,30 +528,48 @@ public class BCHubUIManager : UIManagerBase
         }
         // Un-suppress: re-show only overlays whose per-overlay Settings flag is true AND whose backing
         // mod is available. Anything the user disabled (or whose mod is absent) stays hidden.
-        if (bcAvailable && Raphael.Config.Settings.ShowExperienceOverlay)
+        // 0.51.1: combined-mode awareness on un-hide. The Combined overlay replaces the 4 standalone info
+        // overlays, but their individual Show* flags persist independently (so they can be restored when
+        // combined is switched off). Without this gate, un-hiding via the OV button / timed restore
+        // resurrected those 4 individuals and never re-showed the Combined panel — so a combined-mode user
+        // who hid all overlays got them back as individuals. Mirror RestoreOverlaysFromSettings /
+        // ApplyAvailabilityToOverlays: in combined mode, re-show the Combined panel (which hides the 4);
+        // otherwise re-show the individuals per their flags.
+        if (bcAvailable)
         {
-            EnsureExperienceOverlay();
-            _experienceOverlay.SetActive(true);
+            if (Raphael.Config.Settings.ShowCombinedOverlay)
+            {
+                ApplyCombinedOverlayMutualExclusion();
+            }
+            else
+            {
+                if (Raphael.Config.Settings.ShowExperienceOverlay)
+                {
+                    EnsureExperienceOverlay();
+                    _experienceOverlay.SetActive(true);
+                }
+                if (Raphael.Config.Settings.ShowFamiliarOverlay)
+                {
+                    EnsureFamiliarOverlay();
+                    _familiarOverlay.SetActive(true);
+                }
+                if (Raphael.Config.Settings.ShowDailyQuestOverlay)
+                {
+                    EnsureDailyQuestOverlay();
+                    _dailyQuestOverlay.SetActive(true);
+                }
+                if (Raphael.Config.Settings.ShowProfessionOverlay)
+                {
+                    EnsureProfessionOverlay();
+                    _professionOverlay.SetActive(true);
+                }
+            }
         }
-        if (bcAvailable && Raphael.Config.Settings.ShowFamiliarOverlay)
-        {
-            EnsureFamiliarOverlay();
-            _familiarOverlay.SetActive(true);
-        }
+        // FamiliarBrowser is NOT one of the combined-replaced info overlays — restore it independently.
         if (Raphael.Config.Settings.ShowFamiliarBrowser)
         {
             EnsureFamiliarBrowserOverlay();
             _familiarBrowserOverlay.SetActive(true);
-        }
-        if (bcAvailable && Raphael.Config.Settings.ShowDailyQuestOverlay)
-        {
-            EnsureDailyQuestOverlay();
-            _dailyQuestOverlay.SetActive(true);
-        }
-        if (bcAvailable && Raphael.Config.Settings.ShowProfessionOverlay)
-        {
-            EnsureProfessionOverlay();
-            _professionOverlay.SetActive(true);
         }
         // B7 (0.19): the Shift-spell overlay reads ShiftCooldownService (resolved straight from the
         // game), NOT the Bloodcraft stream — and Shift is used by BOTH Bloodcraft and Beelzebub. So it

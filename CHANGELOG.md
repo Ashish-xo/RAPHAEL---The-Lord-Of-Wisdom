@@ -1,5 +1,15 @@
 # Changelog — Raphael, Lord of Wisdom
 
+## 0.51.1 — Fix: Combined overlay came back as individual overlays after "hide all"
+
+- **Fix: the OV "hide all overlays" button dropped the Combined overlay.** For players using the single
+  **Combined** info overlay (instead of the standalone XP / Familiar / Daily Quest / Professions overlays),
+  pressing the **OV** button to hide all overlays and then un-hiding brought them back as the **individual**
+  overlays rather than the Combined one. The un-hide path wasn't combined-mode-aware: it re-showed the four
+  individual overlays from their (independently-persisted) Show* flags and never re-showed the Combined panel.
+  Un-hide now restores the Combined overlay when combined mode is on, matching the login and availability
+  restore paths. (Reported via tester feedback.)
+
 ## 0.51.0 — Compliance update
 
 A compliance-only release that brings Raphael into line with the V Rising modding community's guidelines.

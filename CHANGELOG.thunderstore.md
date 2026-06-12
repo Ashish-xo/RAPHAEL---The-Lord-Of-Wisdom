@@ -3,6 +3,11 @@
 Raphael began as **BloodCraftHub** (v0.1 → v0.30). Condensed milestone history below; full per-patch detail
 lives in [`CHANGELOG.md`](https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom/blob/main/CHANGELOG.md).
 
+## 0.51.1 — Fix: Combined overlay after "hide all"
+- **Fix:** if you use the single **Combined** info overlay, hiding all overlays with the **OV** button and
+  then un-hiding brought them back as the **individual** overlays instead of the Combined one. Un-hide now
+  correctly restores the Combined overlay. (Tester feedback.)
+
 ## 0.51.0 — Compliance update
 - A compliance-only release that brings Raphael into line with the V Rising modding community's guidelines.
   No new features and no other behavior changes.
