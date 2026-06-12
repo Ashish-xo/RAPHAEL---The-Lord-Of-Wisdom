@@ -141,6 +141,7 @@ public class Settings
     public static float XPOverlayTransparency        => GetFloat(nameof(XPOverlayTransparency),        UITransparency);
     public static float FamiliarOverlayTransparency  => GetFloat(nameof(FamiliarOverlayTransparency),  UITransparency);
     public static float FamiliarBrowserTransparency  => GetFloat(nameof(FamiliarBrowserTransparency),  UITransparency);
+    public static float FamiliarQuickSpawnOverlayTransparency => GetFloat(nameof(FamiliarQuickSpawnOverlayTransparency), UITransparency);
     public static float ShiftSpellOverlayTransparency => GetFloat(nameof(ShiftSpellOverlayTransparency), UITransparency);
     public static float QuickActionsOverlayTransparency => GetFloat(nameof(QuickActionsOverlayTransparency), UITransparency);
     public static float BeelzActionBarOverlayTransparency => GetFloat(nameof(BeelzActionBarOverlayTransparency), UITransparency);
@@ -154,6 +155,7 @@ public class Settings
     public static void SetXPOverlayTransparency(float v)        => SetFloat(nameof(XPOverlayTransparency), v);
     public static void SetFamiliarOverlayTransparency(float v)  => SetFloat(nameof(FamiliarOverlayTransparency), v);
     public static void SetFamiliarBrowserTransparency(float v)  => SetFloat(nameof(FamiliarBrowserTransparency), v);
+    public static void SetFamiliarQuickSpawnOverlayTransparency(float v) => SetFloat(nameof(FamiliarQuickSpawnOverlayTransparency), v);
     public static void SetShiftSpellOverlayTransparency(float v) => SetFloat(nameof(ShiftSpellOverlayTransparency), v);
     public static void SetQuickActionsOverlayTransparency(float v) => SetFloat(nameof(QuickActionsOverlayTransparency), v);
     public static void SetBeelzActionBarOverlayTransparency(float v) => SetFloat(nameof(BeelzActionBarOverlayTransparency), v);
@@ -696,6 +698,7 @@ public class Settings
     public static bool ShowExperienceOverlay   => (ConfigEntries[nameof(ShowExperienceOverlay)]   as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowFamiliarOverlay     => (ConfigEntries[nameof(ShowFamiliarOverlay)]     as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowFamiliarBrowser     => (ConfigEntries[nameof(ShowFamiliarBrowser)]     as ConfigEntry<bool>)?.Value ?? false;
+    public static bool ShowFamiliarQuickSpawnOverlay => (ConfigEntries[nameof(ShowFamiliarQuickSpawnOverlay)] as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowDailyQuestOverlay   => (ConfigEntries[nameof(ShowDailyQuestOverlay)]   as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowProfessionOverlay   => (ConfigEntries[nameof(ShowProfessionOverlay)]   as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowShiftSpellOverlay   => (ConfigEntries[nameof(ShowShiftSpellOverlay)]   as ConfigEntry<bool>)?.Value ?? false;
@@ -976,6 +979,66 @@ public class Settings
     public static void SetShowExperienceOverlay(bool v) => SetBool(nameof(ShowExperienceOverlay), v);
     public static void SetShowFamiliarOverlay(bool v)   => SetBool(nameof(ShowFamiliarOverlay),   v);
     public static void SetShowFamiliarBrowser(bool v)   => SetBool(nameof(ShowFamiliarBrowser),   v);
+    public static void SetShowFamiliarQuickSpawnOverlay(bool v) => SetBool(nameof(ShowFamiliarQuickSpawnOverlay), v);
+
+    // 0.52: ordered list (up to 5) of familiar NAMES the user pinned to the
+    // Quick Spawn overlay. Stored as a single '|'-delimited string (familiar
+    // names never contain '|'). Assigned from the All Familiars tab.
+    public const int FamiliarQuickSpawnMaxSlots = 5;
+    private static string FamiliarQuickSpawnSlotsRaw
+    {
+        get => (ConfigEntries.TryGetValue(nameof(FamiliarQuickSpawnSlotsRaw), out var e) && e is ConfigEntry<string> s) ? (s.Value ?? "") : "";
+        set { if (ConfigEntries.TryGetValue(nameof(FamiliarQuickSpawnSlotsRaw), out var e) && e is ConfigEntry<string> s) s.Value = value ?? ""; }
+    }
+    public static System.Collections.Generic.List<string> GetFamiliarQuickSpawnSlots()
+    {
+        var list = new System.Collections.Generic.List<string>();
+        var raw = FamiliarQuickSpawnSlotsRaw;
+        if (!string.IsNullOrEmpty(raw))
+            foreach (var part in raw.Split('|'))
+            {
+                var t = part.Trim();
+                if (t.Length > 0 && list.Count < FamiliarQuickSpawnMaxSlots) list.Add(t);
+            }
+        return list;
+    }
+    private static void WriteFamiliarQuickSpawnSlots(System.Collections.Generic.List<string> slots)
+    {
+        var clean = new System.Collections.Generic.List<string>();
+        if (slots != null)
+            foreach (var s in slots)
+            {
+                var t = (s ?? "").Trim();
+                if (t.Length > 0 && clean.Count < FamiliarQuickSpawnMaxSlots) clean.Add(t);
+            }
+        FamiliarQuickSpawnSlotsRaw = string.Join("|", clean);
+    }
+    /// <summary>Append a familiar to the Quick Spawn list (no-op if already present or list is full).
+    /// Returns true if added.</summary>
+    public static bool AddFamiliarQuickSpawnSlot(string name)
+    {
+        var t = (name ?? "").Trim();
+        if (t.Length == 0) return false;
+        var list = GetFamiliarQuickSpawnSlots();
+        if (list.Count >= FamiliarQuickSpawnMaxSlots) return false;
+        if (list.Exists(x => string.Equals(x, t, System.StringComparison.OrdinalIgnoreCase))) return false;
+        list.Add(t);
+        WriteFamiliarQuickSpawnSlots(list);
+        return true;
+    }
+    public static void RemoveFamiliarQuickSpawnSlot(string name)
+    {
+        var t = (name ?? "").Trim();
+        var list = GetFamiliarQuickSpawnSlots();
+        list.RemoveAll(x => string.Equals(x, t, System.StringComparison.OrdinalIgnoreCase));
+        WriteFamiliarQuickSpawnSlots(list);
+    }
+    public static bool IsFamiliarQuickSpawnSlot(string name)
+    {
+        var t = (name ?? "").Trim();
+        if (t.Length == 0) return false;
+        return GetFamiliarQuickSpawnSlots().Exists(x => string.Equals(x, t, System.StringComparison.OrdinalIgnoreCase));
+    }
     public static void SetShowDailyQuestOverlay(bool v) => SetBool(nameof(ShowDailyQuestOverlay), v);
     public static void SetShowProfessionOverlay(bool v) => SetBool(nameof(ShowProfessionOverlay), v);
     public static void SetShowShiftSpellOverlay(bool v) => SetBool(nameof(ShowShiftSpellOverlay), v);
@@ -1366,6 +1429,8 @@ public class Settings
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowExperienceOverlay),       false, "Whether the XP overlay was visible at last logout. Restored automatically on UI bring-up.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowFamiliarOverlay),         false, "Whether the Familiar overlay (active stats) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowFamiliarBrowser),         false, "Whether the Familiar Browser overlay was visible at last logout.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowFamiliarQuickSpawnOverlay), false, "Whether the Familiar Quick Spawn overlay (up to 5 one-click familiar-summon buttons) was visible at last logout.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FamiliarQuickSpawnSlotsRaw),   "",    "The familiars pinned to the Quick Spawn overlay — a '|'-delimited list of up to 5 familiar names. Edited from the All Familiars tab.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowDailyQuestOverlay),       false, "Whether the Daily Quest overlay was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowProfessionOverlay),       false, "Whether the Professions overlay (Bloodcraft profession levels) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowShiftSpellOverlay),       false, "Whether the Shift-spell cooldown overlay (Eclipse-style visual readout for the slot-3 ability) was visible at last logout.");
@@ -1445,6 +1510,7 @@ public class Settings
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(XPOverlayTransparency),       0.4f,  "XP overlay background transparency (0.0=solid, 1.0=invisible). Floor at 0.95 keeps drag handle visible.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FamiliarOverlayTransparency), 0.4f,  "Familiar overlay background transparency.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FamiliarBrowserTransparency), 0.4f,  "Familiar Browser overlay background transparency.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FamiliarQuickSpawnOverlayTransparency), 0.4f, "Familiar Quick Spawn overlay background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(DailyQuestTransparency),      0.4f,  "Daily quest overlay background transparency.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ProfessionOverlayTransparency), 0.4f, "Profession overlay background transparency.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShiftSpellOverlayTransparency), 0.4f, "Shift-spell cooldown overlay background transparency (0.0=solid, 1.0=invisible).");

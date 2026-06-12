@@ -6,6 +6,7 @@ using Raphael.Services;
 using Raphael.UI.Framework.CustomLib.Util;
 using Raphael.UI.Framework.UniverseLib.UI;
 using Raphael.UI.Framework.UniverseLib.UI.Models;
+using Raphael.UI.ModContent.Data;
 using Raphael.Utils;
 using TMPro;
 using UnityEngine;
@@ -45,6 +46,10 @@ public partial class MainPanel
     private float _allFamPendingDeleteDeadline = -1f;
     private const float ALLFAM_DELETE_CONFIRM_WINDOW_SECONDS = 3f;
 
+    // 0.52: Quick Spawn assignment UI (card at the top of this tab).
+    private GameObject _qsSlotsContainer;
+    private ButtonRef  _qsShowOverlayBtn;
+
     private void BuildAllFamiliarsTab(GameObject page)
     {
         var headerCard = AddCard(page, "AllFamHeaderCard");
@@ -54,6 +59,8 @@ public partial class MainPanel
             $"Delete permanently removes the entry ({Mono(".fam r")} — two-click confirm). " +
             $"The list is populated by the same V-Blood scanner — click {Mono("Scan all")} to walk every box; if you already scanned for V-Bloods the rows are already here.");
 
+        AddSpacer(page, 6);
+        BuildQuickSpawnCard(page);
         AddSpacer(page, 6);
 
         var statusCard = AddCard(page, "AllFamStatusCard");
@@ -159,6 +166,138 @@ public partial class MainPanel
         RefreshAllFamScanButton();
     }
 
+    // 0.52: Quick Spawn assignment card. Pins up to N familiars (by name) to the
+    // Quick Spawn overlay, drawing names from the cross-box list this tab shows.
+    private void BuildQuickSpawnCard(GameObject page)
+    {
+        var card = AddCard(page, "AllFamQuickSpawnCard");
+        AddSectionHeading(card, "Quick Spawn slots");
+        AddBodyText(card,
+            $"Pin up to {Config.Settings.FamiliarQuickSpawnMaxSlots} familiars here for one-click summoning from the draggable " +
+            $"Quick Spawn overlay — it summons by name regardless of which box they live in ({Mono(".fam sb")}). " +
+            $"Click {Mono("+ QS")} on any row below to add it; clear a slot with its {Mono("Clear")} button.");
+
+        var ctrlRow = UIFactory.CreateHorizontalGroup(card, "QSCardCtrlRow",
+            forceExpandWidth: true, forceExpandHeight: false,
+            childControlWidth: true, childControlHeight: true,
+            spacing: 6, padding: new Vector4(0, 0, 0, 0));
+        UIFactory.SetLayoutElement(ctrlRow,
+            minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
+            minHeight: 30, preferredHeight: 32, flexibleHeight: 0);
+
+        _qsShowOverlayBtn = UIFactory.CreateButton(ctrlRow, "QSShowOverlayBtn", FormatQsShowBtnText());
+        UIFactory.SetLayoutElement(_qsShowOverlayBtn.GameObject,
+            minWidth: 150, preferredWidth: 180, flexibleWidth: 0,
+            minHeight: 26, preferredHeight: 28, flexibleHeight: 0);
+        var showTxt = _qsShowOverlayBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
+        if (showTxt != null) { showTxt.fontSize = Theme.ScaledUI(12); showTxt.alignment = TextAlignmentOptions.Center; }
+        TooltipHover.Attach(_qsShowOverlayBtn.GameObject, "Show or hide the draggable Quick Spawn overlay on screen.");
+        _qsShowOverlayBtn.OnClick = () =>
+        {
+            Plugin.UIManager?.ToggleOverlay(PanelType.FamiliarQuickSpawnOverlay);
+            RefreshQsShowBtn();
+        };
+
+        _qsSlotsContainer = UIFactory.CreateVerticalGroup(card, "QSCardSlots",
+            forceWidth: true, forceHeight: false,
+            childControlWidth: true, childControlHeight: true,
+            spacing: 3, padding: new Vector4(0, 2, 0, 0));
+        UIFactory.SetLayoutElement(_qsSlotsContainer,
+            minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
+            minHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
+
+        RebuildQuickSpawnSlots();
+    }
+
+    private string FormatQsShowBtnText()
+        => (Plugin.UIManager?.IsOverlayOpen(PanelType.FamiliarQuickSpawnOverlay) ?? false)
+            ? "Hide Quick Spawn overlay" : "Show Quick Spawn overlay";
+
+    private void RefreshQsShowBtn()
+    {
+        if (_qsShowOverlayBtn == null) return;
+        var t = _qsShowOverlayBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
+        if (t != null) t.text = FormatQsShowBtnText();
+    }
+
+    private void RebuildQuickSpawnSlots()
+    {
+        if (_qsSlotsContainer == null) return;
+        for (int i = _qsSlotsContainer.transform.childCount - 1; i >= 0; --i)
+            UnityEngine.Object.Destroy(_qsSlotsContainer.transform.GetChild(i).gameObject);
+
+        var slots = Config.Settings.GetFamiliarQuickSpawnSlots();
+        var header = UIFactory.CreateLabel(_qsSlotsContainer, "QSSlotsHeader",
+            $"<color={Theme.MutedBodyHex}>Assigned ({slots.Count}/{Config.Settings.FamiliarQuickSpawnMaxSlots}):</color>",
+            TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
+        UIFactory.SetLayoutElement(header.GameObject,
+            minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
+            minHeight: Theme.ScaledHeight(18), preferredHeight: Theme.ScaledHeight(20), flexibleHeight: 0);
+
+        if (slots.Count == 0)
+        {
+            var none = UIFactory.CreateLabel(_qsSlotsContainer, "QSSlotsNone",
+                "(none yet — click + QS on a familiar row below)",
+                TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
+            UIFactory.SetLayoutElement(none.GameObject,
+                minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
+                minHeight: Theme.ScaledHeight(18), preferredHeight: Theme.ScaledHeight(20), flexibleHeight: 0);
+            none.TextMesh.fontStyle = FontStyles.Italic;
+            return;
+        }
+
+        int n = 1;
+        foreach (var name in slots)
+        {
+            var row = UIFactory.CreateHorizontalGroup(_qsSlotsContainer, $"QSSlotRow_{n}",
+                forceExpandWidth: true, forceExpandHeight: false,
+                childControlWidth: true, childControlHeight: true,
+                spacing: 6, padding: new Vector4(2, 2, 1, 1));
+            UIFactory.SetLayoutElement(row,
+                minWidth: 360, preferredWidth: 400, flexibleWidth: 1,
+                minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
+
+            var lbl = UIFactory.CreateLabel(row, "QSSlotName", $"{n}.  {name}",
+                TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
+            UIFactory.SetLayoutElement(lbl.GameObject,
+                minWidth: 200, preferredWidth: 300, flexibleWidth: 1,
+                minHeight: Theme.ScaledHeight(20), preferredHeight: Theme.ScaledHeight(22), flexibleHeight: 0);
+            lbl.TextMesh.enableWordWrapping = false;
+            lbl.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
+
+            var clearBtn = UIFactory.CreateButton(row, $"QSSlotClear_{n}", "Clear",
+                new Color(0.45f, 0.2f, 0.2f));
+            UIFactory.SetLayoutElement(clearBtn.GameObject,
+                minWidth: 64, preferredWidth: 80, flexibleWidth: 0,
+                minHeight: Theme.ScaledHeight(20), preferredHeight: Theme.ScaledHeight(22), flexibleHeight: 0);
+            var cTxt = clearBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
+            if (cTxt != null) cTxt.fontSize = Theme.ScaledUI(11);
+            string captured = name;
+            clearBtn.OnClick = () => OnQuickSpawnClear(captured);
+            n++;
+        }
+    }
+
+    private void OnQuickSpawnAssign(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return;
+        if (!Config.Settings.AddFamiliarQuickSpawnSlot(name)) return;
+        AfterQuickSpawnChange();
+    }
+
+    private void OnQuickSpawnClear(string name)
+    {
+        Config.Settings.RemoveFamiliarQuickSpawnSlot(name);
+        AfterQuickSpawnChange();
+    }
+
+    private void AfterQuickSpawnChange()
+    {
+        RebuildQuickSpawnSlots();
+        RebuildAllFamRows();                                  // refresh per-row +QS button state
+        FamiliarQuickSpawnOverlayPanel.RaiseSlotsChanged();   // live-refresh the overlay if it's open
+    }
+
     private void BuildAllFamColumnHeader(GameObject parent)
     {
         var headerRow = UIFactory.CreateHorizontalGroup(parent, "AllFamColHeader",
@@ -186,6 +325,7 @@ public partial class MainPanel
         AddCol("Familiar",        160, 200, 1);
         AddCol("Level",            46,  56, 0);
         AddCol("",                 60,  80, 0); // [Bind] column
+        AddCol("",                 50,  64, 0); // [+QS] column
         AddCol("",                 56,  72, 0); // [Delete] column
     }
 
@@ -425,6 +565,24 @@ public partial class MainPanel
         string captureBox = r.Box;
         int    captureIdx = r.Index;
         bindBtn.OnClick = () => OnAllFamBindClicked(captureBox, captureIdx);
+
+        // 0.52: + QS — pin this familiar to the Quick Spawn overlay (by name).
+        bool isSlot     = Config.Settings.IsFamiliarQuickSpawnSlot(r.Name);
+        bool slotsFull  = Config.Settings.GetFamiliarQuickSpawnSlots().Count >= Config.Settings.FamiliarQuickSpawnMaxSlots;
+        var qsBtn = UIFactory.CreateButton(row, $"AllFamQS_{r.Box}_{r.Index}", isSlot ? "✓ QS" : "+ QS");
+        UIFactory.SetLayoutElement(qsBtn.GameObject,
+            minWidth: 50, preferredWidth: 64, flexibleWidth: 0,
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
+        var qsTxt = qsBtn.Component.GetComponentInChildren<TextMeshProUGUI>();
+        if (qsTxt != null) qsTxt.fontSize = Theme.ScaledUI(11);
+        qsBtn.Component.interactable = !isSlot && !slotsFull;
+        TooltipHover.Attach(qsBtn.GameObject, isSlot
+            ? "Already pinned to Quick Spawn — clear it from the Quick Spawn slots card above."
+            : slotsFull
+                ? $"Quick Spawn is full ({Config.Settings.FamiliarQuickSpawnMaxSlots} slots). Clear one first."
+                : "Pin this familiar to the Quick Spawn overlay for one-click summoning.");
+        string capQsName = r.Name;
+        qsBtn.OnClick = () => OnQuickSpawnAssign(capQsName);
 
         // Delete button — two-click confirm, then .fam cb <box> + .fam r <idx>.
         var delBtn = UIFactory.CreateButton(row, $"AllFamDel_{r.Box}_{r.Index}", "Delete",

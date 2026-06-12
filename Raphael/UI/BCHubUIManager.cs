@@ -31,6 +31,7 @@ public class BCHubUIManager : UIManagerBase
     private ExperienceOverlayPanel _experienceOverlay;
     private FamiliarOverlayPanel _familiarOverlay;
     private FamiliarBrowserOverlayPanel _familiarBrowserOverlay;
+    private FamiliarQuickSpawnOverlayPanel _familiarQuickSpawnOverlay; // 0.52: up-to-5 one-click familiar summon
     private DailyQuestOverlayPanel _dailyQuestOverlay;
     private ProfessionOverlayPanel _professionOverlay;
     private ShiftSpellOverlayPanel _shiftSpellOverlay;
@@ -91,6 +92,7 @@ public class BCHubUIManager : UIManagerBase
     public ExperienceOverlayPanel       ExperienceOverlay     => _experienceOverlay;
     public FamiliarOverlayPanel         FamiliarOverlay       => _familiarOverlay;
     public FamiliarBrowserOverlayPanel  FamiliarBrowserOverlay => _familiarBrowserOverlay;
+    public FamiliarQuickSpawnOverlayPanel FamiliarQuickSpawnOverlay => _familiarQuickSpawnOverlay;
     public DailyQuestOverlayPanel       DailyQuestOverlay     => _dailyQuestOverlay;
     public ProfessionOverlayPanel       ProfessionOverlay     => _professionOverlay;
     public ShiftSpellOverlayPanel       ShiftSpellOverlay     => _shiftSpellOverlay;
@@ -107,6 +109,7 @@ public class BCHubUIManager : UIManagerBase
         ApplyPinnedTo(_experienceOverlay, pinned);
         ApplyPinnedTo(_familiarOverlay, pinned);
         ApplyPinnedTo(_familiarBrowserOverlay, pinned);
+        ApplyPinnedTo(_familiarQuickSpawnOverlay, pinned);
         ApplyPinnedTo(_dailyQuestOverlay, pinned);
         ApplyPinnedTo(_professionOverlay, pinned);
         ApplyPinnedTo(_shiftSpellOverlay, pinned);
@@ -143,6 +146,7 @@ public class BCHubUIManager : UIManagerBase
         _experienceOverlay = null;
         _familiarOverlay = null;
         _familiarBrowserOverlay = null;
+        _familiarQuickSpawnOverlay = null;
         _dailyQuestOverlay = null;
         _professionOverlay = null;
         _combinedOverlay = null;
@@ -172,6 +176,7 @@ public class BCHubUIManager : UIManagerBase
         _experienceOverlay?.SetActive(active && (_experienceOverlay?.Enabled ?? false));
         _familiarOverlay?.SetActive(active && (_familiarOverlay?.Enabled ?? false));
         _familiarBrowserOverlay?.SetActive(active && (_familiarBrowserOverlay?.Enabled ?? false));
+        _familiarQuickSpawnOverlay?.SetActive(active && (_familiarQuickSpawnOverlay?.Enabled ?? false));
         _dailyQuestOverlay?.SetActive(active && (_dailyQuestOverlay?.Enabled ?? false));
         _professionOverlay?.SetActive(active && (_professionOverlay?.Enabled ?? false));
         _shiftSpellOverlay?.SetActive(active && (_shiftSpellOverlay?.Enabled ?? false));
@@ -316,6 +321,11 @@ public class BCHubUIManager : UIManagerBase
                 EnsureFamiliarOverlay();
                 _familiarOverlay.SetActive(!_familiarOverlay.Enabled);
                 Raphael.Config.Settings.SetShowFamiliarOverlay(_familiarOverlay.Enabled);
+                break;
+            case PanelType.FamiliarQuickSpawnOverlay:
+                EnsureFamiliarQuickSpawnOverlay();
+                _familiarQuickSpawnOverlay.SetActive(!_familiarQuickSpawnOverlay.Enabled);
+                Raphael.Config.Settings.SetShowFamiliarQuickSpawnOverlay(_familiarQuickSpawnOverlay.Enabled);
                 break;
             case PanelType.FamiliarBrowserOverlay:
                 EnsureFamiliarBrowserOverlay();
@@ -505,6 +515,7 @@ public class BCHubUIManager : UIManagerBase
             _experienceOverlay?.SetActive(false);
             _familiarOverlay?.SetActive(false);
             _familiarBrowserOverlay?.SetActive(false);
+            _familiarQuickSpawnOverlay?.SetActive(false);
             _dailyQuestOverlay?.SetActive(false);
             _professionOverlay?.SetActive(false);
             _shiftSpellOverlay?.SetActive(false);
@@ -570,6 +581,11 @@ public class BCHubUIManager : UIManagerBase
         {
             EnsureFamiliarBrowserOverlay();
             _familiarBrowserOverlay.SetActive(true);
+        }
+        if (Raphael.Config.Settings.ShowFamiliarQuickSpawnOverlay)
+        {
+            EnsureFamiliarQuickSpawnOverlay();
+            _familiarQuickSpawnOverlay.SetActive(true);
         }
         // B7 (0.19): the Shift-spell overlay reads ShiftCooldownService (resolved straight from the
         // game), NOT the Bloodcraft stream — and Shift is used by BOTH Bloodcraft and Beelzebub. So it
@@ -736,6 +752,11 @@ public class BCHubUIManager : UIManagerBase
         {
             EnsureFamiliarBrowserOverlay();
             _familiarBrowserOverlay.SetActive(true);
+        }
+        if (Raphael.Config.Settings.ShowFamiliarQuickSpawnOverlay)
+        {
+            EnsureFamiliarQuickSpawnOverlay();
+            _familiarQuickSpawnOverlay.SetActive(true);
         }
         if (Raphael.Config.Settings.ShowQuickActionsOverlay)
         {
@@ -972,6 +993,7 @@ public class BCHubUIManager : UIManagerBase
         PanelType.ExperienceOverlay      => _experienceOverlay?.Enabled ?? false,
         PanelType.FamiliarOverlay        => _familiarOverlay?.Enabled ?? false,
         PanelType.FamiliarBrowserOverlay => _familiarBrowserOverlay?.Enabled ?? false,
+        PanelType.FamiliarQuickSpawnOverlay => _familiarQuickSpawnOverlay?.Enabled ?? false,
         PanelType.DailyQuestOverlay      => _dailyQuestOverlay?.Enabled ?? false,
         PanelType.ProfessionOverlay      => _professionOverlay?.Enabled ?? false,
         PanelType.ShiftSpellOverlay      => _shiftSpellOverlay?.Enabled ?? false,
@@ -1010,6 +1032,18 @@ public class BCHubUIManager : UIManagerBase
         _panels.Add(_familiarBrowserOverlay);
         _familiarBrowserOverlay.SetActive(false);
     }
+
+    private void EnsureFamiliarQuickSpawnOverlay()
+    {
+        if (_familiarQuickSpawnOverlay != null) return;
+        _familiarQuickSpawnOverlay = new FamiliarQuickSpawnOverlayPanel(UiBase);
+        _panels.Add(_familiarQuickSpawnOverlay);
+        _familiarQuickSpawnOverlay.SetActive(false);
+    }
+
+    /// <summary>0.52: live-refresh the Quick Spawn overlay's slot buttons after the
+    /// All Familiars assignment UI adds/clears a slot. No-op when the overlay isn't built.</summary>
+    public void RefreshFamiliarQuickSpawnOverlay() => _familiarQuickSpawnOverlay?.RefreshSlots();
 
     private void EnsureDailyQuestOverlay()
     {
@@ -1319,6 +1353,7 @@ public class BCHubUIManager : UIManagerBase
         _experienceOverlay?.RefreshOpacity();
         _familiarOverlay?.RefreshOpacity();
         _familiarBrowserOverlay?.RefreshOpacity();
+        _familiarQuickSpawnOverlay?.RefreshOpacity();
         _dailyQuestOverlay?.RefreshOpacity();
         _professionOverlay?.RefreshOpacity();
         _shiftSpellOverlay?.RefreshOpacity();
@@ -1349,6 +1384,7 @@ public class BCHubUIManager : UIManagerBase
         _experienceOverlay?.RefreshBackgroundColor();
         _familiarOverlay?.RefreshBackgroundColor();
         _familiarBrowserOverlay?.RefreshBackgroundColor();
+        _familiarQuickSpawnOverlay?.RefreshBackgroundColor();
         _dailyQuestOverlay?.RefreshBackgroundColor();
         _professionOverlay?.RefreshBackgroundColor();
         _shiftSpellOverlay?.RefreshBackgroundColor();
@@ -1470,6 +1506,7 @@ public class BCHubUIManager : UIManagerBase
         RebuildOverlay(ref _experienceOverlay,      !combined && Raphael.Config.Settings.ShowExperienceOverlay, b => new ExperienceOverlayPanel(b));
         RebuildOverlay(ref _familiarOverlay,        !combined && Raphael.Config.Settings.ShowFamiliarOverlay,   b => new FamiliarOverlayPanel(b));
         RebuildOverlay(ref _familiarBrowserOverlay, Raphael.Config.Settings.ShowFamiliarBrowser,                b => new FamiliarBrowserOverlayPanel(b));
+        RebuildOverlay(ref _familiarQuickSpawnOverlay, Raphael.Config.Settings.ShowFamiliarQuickSpawnOverlay,   b => new FamiliarQuickSpawnOverlayPanel(b));
         RebuildOverlay(ref _dailyQuestOverlay,      !combined && Raphael.Config.Settings.ShowDailyQuestOverlay, b => new DailyQuestOverlayPanel(b));
         RebuildOverlay(ref _professionOverlay,      !combined && Raphael.Config.Settings.ShowProfessionOverlay, b => new ProfessionOverlayPanel(b));
         RebuildOverlay(ref _shiftSpellOverlay,      Raphael.Config.Settings.ShowShiftSpellOverlay,              b => new ShiftSpellOverlayPanel(b));

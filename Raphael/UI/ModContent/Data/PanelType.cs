@@ -101,6 +101,7 @@ public enum PanelType
     ExperienceOverlay,
     FamiliarOverlay,
     FamiliarBrowserOverlay,
+    FamiliarQuickSpawnOverlay,  // 0.52: up-to-5 user-assigned familiars, one-click summon by name (.fam sb)
     ProfessionOverlay,
     ShiftSpellOverlay,      // 0.11.0: visual cooldown ring/bar for the shift slot (Eclipse-style)
     CombinedOverlay,        // 0.14.0: single combined info overlay (XP + Familiar + Wep + Blood + Prof + Quests)

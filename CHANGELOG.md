@@ -1,5 +1,22 @@
 # Changelog — Raphael, Lord of Wisdom
 
+## 0.52.0 — New: Familiar Quick Spawn overlay
+
+- **New: Familiar Quick Spawn overlay (Bloodcraft).** A small, draggable overlay with up to **5 one-click
+  buttons**, each pinned to a specific familiar. Clicking a button summons that familiar **by name regardless
+  of which box it's in** (Bloodcraft's smart-bind, `.fam sb`) — if a different familiar is active it switches
+  automatically. Two footer buttons cover the two distinct "put away" actions:
+  - **Dismiss / Recall** (`.fam t`) — toggles your *active* familiar offline/online without unbinding it. It
+    stays your active familiar; it's just hidden / out of combat.
+  - **Unbind** (`.fam ub`) — releases the binding so you can summon a different familiar (non-destructive; the
+    familiar returns to its box). Clicking a slot whose familiar is *already* active also Dismisses/Recalls it.
+- **Assign familiars from the All Familiars tab.** Each row gains a **+ QS** button to pin that familiar; a new
+  **Quick Spawn slots** card at the top of the tab lists your assignments (with **Clear**) and a
+  **Show/Hide Quick Spawn overlay** button. Assignments persist across sessions.
+- The overlay is fully integrated with the overlay system — draggable/resizable, its own transparency, honors
+  the **OV** hide-all toggle and the **Lock overlays** setting, and restores on login. It shows a hint when no
+  familiars are assigned and disables itself if the server has Bloodcraft's Familiar system turned off.
+
 ## 0.51.1 — Fix: Combined overlay came back as individual overlays after "hide all"
 
 - **Fix: the OV "hide all overlays" button dropped the Combined overlay.** For players using the single

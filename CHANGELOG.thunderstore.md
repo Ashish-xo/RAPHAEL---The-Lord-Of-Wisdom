@@ -3,6 +3,14 @@
 Raphael began as **BloodCraftHub** (v0.1 → v0.30). Condensed milestone history below; full per-patch detail
 lives in [`CHANGELOG.md`](https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom/blob/main/CHANGELOG.md).
 
+## 0.52.0 — New: Familiar Quick Spawn overlay
+- **New: Familiar Quick Spawn overlay (Bloodcraft).** A draggable overlay with up to **5 one-click buttons**,
+  each pinned to a familiar, that summons it **by name regardless of which box it's in** (`.fam sb`). Includes
+  **Dismiss / Recall** (toggle your active familiar offline/online without unbinding) and **Unbind** (release
+  so you can summon another). Assign familiars via the new **+ QS** buttons + **Quick Spawn slots** card on the
+  **All Familiars** tab; assignments persist. Fully integrated with the overlay system (drag/resize,
+  transparency, OV hide-all, Lock overlays, login restore).
+
 ## 0.51.1 — Fix: Combined overlay after "hide all"
 - **Fix:** if you use the single **Combined** info overlay, hiding all overlays with the **OV** button and
   then un-hiding brought them back as the **individual** overlays instead of the Combined one. Un-hide now
