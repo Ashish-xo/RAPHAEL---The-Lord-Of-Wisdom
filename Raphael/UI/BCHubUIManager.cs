@@ -32,6 +32,7 @@ public class BCHubUIManager : UIManagerBase
     private FamiliarOverlayPanel _familiarOverlay;
     private FamiliarBrowserOverlayPanel _familiarBrowserOverlay;
     private FamiliarQuickSpawnOverlayPanel _familiarQuickSpawnOverlay; // 0.52: up-to-5 one-click familiar summon
+    private FaustBossTrackerOverlayPanel _faustBossTrackerOverlay; // 0.54: up-to-3 tracked V Blood statuses
     private DailyQuestOverlayPanel _dailyQuestOverlay;
     private ProfessionOverlayPanel _professionOverlay;
     private ShiftSpellOverlayPanel _shiftSpellOverlay;
@@ -110,6 +111,7 @@ public class BCHubUIManager : UIManagerBase
         ApplyPinnedTo(_familiarOverlay, pinned);
         ApplyPinnedTo(_familiarBrowserOverlay, pinned);
         ApplyPinnedTo(_familiarQuickSpawnOverlay, pinned);
+        ApplyPinnedTo(_faustBossTrackerOverlay, pinned);
         ApplyPinnedTo(_dailyQuestOverlay, pinned);
         ApplyPinnedTo(_professionOverlay, pinned);
         ApplyPinnedTo(_shiftSpellOverlay, pinned);
@@ -147,6 +149,7 @@ public class BCHubUIManager : UIManagerBase
         _familiarOverlay = null;
         _familiarBrowserOverlay = null;
         _familiarQuickSpawnOverlay = null;
+        _faustBossTrackerOverlay = null;
         _dailyQuestOverlay = null;
         _professionOverlay = null;
         _combinedOverlay = null;
@@ -177,6 +180,7 @@ public class BCHubUIManager : UIManagerBase
         _familiarOverlay?.SetActive(active && (_familiarOverlay?.Enabled ?? false));
         _familiarBrowserOverlay?.SetActive(active && (_familiarBrowserOverlay?.Enabled ?? false));
         _familiarQuickSpawnOverlay?.SetActive(active && (_familiarQuickSpawnOverlay?.Enabled ?? false));
+        _faustBossTrackerOverlay?.SetActive(active && (_faustBossTrackerOverlay?.Enabled ?? false));
         _dailyQuestOverlay?.SetActive(active && (_dailyQuestOverlay?.Enabled ?? false));
         _professionOverlay?.SetActive(active && (_professionOverlay?.Enabled ?? false));
         _shiftSpellOverlay?.SetActive(active && (_shiftSpellOverlay?.Enabled ?? false));
@@ -326,6 +330,11 @@ public class BCHubUIManager : UIManagerBase
                 EnsureFamiliarQuickSpawnOverlay();
                 _familiarQuickSpawnOverlay.SetActive(!_familiarQuickSpawnOverlay.Enabled);
                 Raphael.Config.Settings.SetShowFamiliarQuickSpawnOverlay(_familiarQuickSpawnOverlay.Enabled);
+                break;
+            case PanelType.FaustBossTrackerOverlay:
+                EnsureFaustBossTrackerOverlay();
+                _faustBossTrackerOverlay.SetActive(!_faustBossTrackerOverlay.Enabled);
+                Raphael.Config.Settings.SetShowFaustBossTrackerOverlay(_faustBossTrackerOverlay.Enabled);
                 break;
             case PanelType.FamiliarBrowserOverlay:
                 EnsureFamiliarBrowserOverlay();
@@ -516,6 +525,7 @@ public class BCHubUIManager : UIManagerBase
             _familiarOverlay?.SetActive(false);
             _familiarBrowserOverlay?.SetActive(false);
             _familiarQuickSpawnOverlay?.SetActive(false);
+            _faustBossTrackerOverlay?.SetActive(false);
             _dailyQuestOverlay?.SetActive(false);
             _professionOverlay?.SetActive(false);
             _shiftSpellOverlay?.SetActive(false);
@@ -586,6 +596,13 @@ public class BCHubUIManager : UIManagerBase
         {
             EnsureFamiliarQuickSpawnOverlay();
             _familiarQuickSpawnOverlay.SetActive(true);
+        }
+        // Faust boss-tracker overlay restores independently of the Bloodcraft stream (it reads the Faust
+        // boss board); the overlay itself shows a "needs Faust 0.16+" hint when Faust isn't present.
+        if (Raphael.Config.Settings.ShowFaustBossTrackerOverlay)
+        {
+            EnsureFaustBossTrackerOverlay();
+            _faustBossTrackerOverlay.SetActive(true);
         }
         // B7 (0.19): the Shift-spell overlay reads ShiftCooldownService (resolved straight from the
         // game), NOT the Bloodcraft stream — and Shift is used by BOTH Bloodcraft and Beelzebub. So it
@@ -757,6 +774,13 @@ public class BCHubUIManager : UIManagerBase
         {
             EnsureFamiliarQuickSpawnOverlay();
             _familiarQuickSpawnOverlay.SetActive(true);
+        }
+        // Faust boss-tracker overlay restores independently of the Bloodcraft stream (it reads the Faust
+        // boss board); the overlay itself shows a "needs Faust 0.16+" hint when Faust isn't present.
+        if (Raphael.Config.Settings.ShowFaustBossTrackerOverlay)
+        {
+            EnsureFaustBossTrackerOverlay();
+            _faustBossTrackerOverlay.SetActive(true);
         }
         if (Raphael.Config.Settings.ShowQuickActionsOverlay)
         {
@@ -994,6 +1018,7 @@ public class BCHubUIManager : UIManagerBase
         PanelType.FamiliarOverlay        => _familiarOverlay?.Enabled ?? false,
         PanelType.FamiliarBrowserOverlay => _familiarBrowserOverlay?.Enabled ?? false,
         PanelType.FamiliarQuickSpawnOverlay => _familiarQuickSpawnOverlay?.Enabled ?? false,
+        PanelType.FaustBossTrackerOverlay => _faustBossTrackerOverlay?.Enabled ?? false,
         PanelType.DailyQuestOverlay      => _dailyQuestOverlay?.Enabled ?? false,
         PanelType.ProfessionOverlay      => _professionOverlay?.Enabled ?? false,
         PanelType.ShiftSpellOverlay      => _shiftSpellOverlay?.Enabled ?? false,
@@ -1044,6 +1069,18 @@ public class BCHubUIManager : UIManagerBase
     /// <summary>0.52: live-refresh the Quick Spawn overlay's slot buttons after the
     /// All Familiars assignment UI adds/clears a slot. No-op when the overlay isn't built.</summary>
     public void RefreshFamiliarQuickSpawnOverlay() => _familiarQuickSpawnOverlay?.RefreshSlots();
+
+    private void EnsureFaustBossTrackerOverlay()
+    {
+        if (_faustBossTrackerOverlay != null) return;
+        _faustBossTrackerOverlay = new FaustBossTrackerOverlayPanel(UiBase);
+        _panels.Add(_faustBossTrackerOverlay);
+        _faustBossTrackerOverlay.SetActive(false);
+    }
+
+    /// <summary>0.54: live-refresh the boss-tracker overlay's rows after the Boss Status assignment UI
+    /// adds/removes a tracked boss. No-op when the overlay isn't built.</summary>
+    public void RefreshFaustBossTrackerOverlay() => _faustBossTrackerOverlay?.RefreshSlots();
 
     private void EnsureDailyQuestOverlay()
     {
@@ -1354,6 +1391,7 @@ public class BCHubUIManager : UIManagerBase
         _familiarOverlay?.RefreshOpacity();
         _familiarBrowserOverlay?.RefreshOpacity();
         _familiarQuickSpawnOverlay?.RefreshOpacity();
+        _faustBossTrackerOverlay?.RefreshOpacity();
         _dailyQuestOverlay?.RefreshOpacity();
         _professionOverlay?.RefreshOpacity();
         _shiftSpellOverlay?.RefreshOpacity();
@@ -1385,6 +1423,7 @@ public class BCHubUIManager : UIManagerBase
         _familiarOverlay?.RefreshBackgroundColor();
         _familiarBrowserOverlay?.RefreshBackgroundColor();
         _familiarQuickSpawnOverlay?.RefreshBackgroundColor();
+        _faustBossTrackerOverlay?.RefreshBackgroundColor();
         _dailyQuestOverlay?.RefreshBackgroundColor();
         _professionOverlay?.RefreshBackgroundColor();
         _shiftSpellOverlay?.RefreshBackgroundColor();
@@ -1507,6 +1546,7 @@ public class BCHubUIManager : UIManagerBase
         RebuildOverlay(ref _familiarOverlay,        !combined && Raphael.Config.Settings.ShowFamiliarOverlay,   b => new FamiliarOverlayPanel(b));
         RebuildOverlay(ref _familiarBrowserOverlay, Raphael.Config.Settings.ShowFamiliarBrowser,                b => new FamiliarBrowserOverlayPanel(b));
         RebuildOverlay(ref _familiarQuickSpawnOverlay, Raphael.Config.Settings.ShowFamiliarQuickSpawnOverlay,   b => new FamiliarQuickSpawnOverlayPanel(b));
+        RebuildOverlay(ref _faustBossTrackerOverlay, Raphael.Config.Settings.ShowFaustBossTrackerOverlay,       b => new FaustBossTrackerOverlayPanel(b));
         RebuildOverlay(ref _dailyQuestOverlay,      !combined && Raphael.Config.Settings.ShowDailyQuestOverlay, b => new DailyQuestOverlayPanel(b));
         RebuildOverlay(ref _professionOverlay,      !combined && Raphael.Config.Settings.ShowProfessionOverlay, b => new ProfessionOverlayPanel(b));
         RebuildOverlay(ref _shiftSpellOverlay,      Raphael.Config.Settings.ShowShiftSpellOverlay,              b => new ShiftSpellOverlayPanel(b));

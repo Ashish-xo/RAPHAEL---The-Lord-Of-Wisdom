@@ -32,6 +32,12 @@
 > | **§11a** | **Territory centroid coords** — `posx=`/`posz=` on `[FAUST:castle]` + `[FAUST:plot]` (castleinfo/castles/decay/plots) | 🟦 **Delivered by Faust (api 17 / 0.15.0)** — Raphael "Loc (X,Z)" column auto-appears |
 > | **§11b** | **Full-map heatmap bounds** — optional `mapbounds=` on `[FAUST:hmhead]` | 🟦 **Delivered by Faust (api 17 / 0.15.0)** — Raphael draws heat maps at true map scale |
 > | — | *(bugfix)* `clanmembers` now resolves clan names **with spaces** (was a no-response timeout) | ✅ Fixed (Faust 0.15.0) |
+> | **§13** | **BUG** — `.faust admin data status` reply overflows VCF's `FixedString512Bytes` → throws server-side (no reply reaches Raphael) | ✅ **Fixed (Faust 0.16.0)** — reply chunked; Raphael's "Data status" button works |
+> | **§14** | **Retire `objectscan`** from the handshake + `admin status` listing (client scan removed/banned) | ✅ **Delivered (api 18)** — dropped from handshake/access/status/config; Raphael already ignores it |
+> | **§15a** | `[FAUST:access]` reports the non-cost gates (`cd`/`window`/`period`/`maxuses`/`nearprefab`/`neardist`) | 🟦 **Delivered (api 18)** — consumed (Admin: Oversight **Gates** column) |
+> | **§15b** | **Live config editor** — `.faust admin set/get/resetcfg` + `setglobal/getglobal` to change cost/cooldown/limit/proximity/etc. at runtime | 🟦 **Delivered (Faust 0.16.0)** — consumed (Admin: Control → **Live config editor**) |
+> | **§B1** | **V Blood boss board** — `.faust api bosses` / `boss <name\|guid>` (live/defeated status, position, HP, level) | 🟦 **Delivered (api 18)** — consumed (Faust → **Boss Status** tab) |
+> | **§B2** | **Kill leaderboards** — `.faust api kills` / `bosskills [days]` (top killers + boss-defeat counts) | 🟦 **Delivered (api 18)** — consumed (Faust → **Leaderboards** tab) |
 >
 > **Open items remaining:** only **§3** (open-world region) and **§5** (confirm map-marker visibility) — both
 > already implemented Faust-side, pending live validation. The **§10 region/roster batch** (api 15) and the
@@ -554,3 +560,214 @@ log (admin-authed; `clans` returns data, so the gate passes and the clan is visi
   `[FAUST:end] cmd=clanmembers` (or `[FAUST:err]`) even on the empty/notfound path, and (c) doesn't throw on the
   page argument. Test inputs Raphael may send: `.faust api clanmembers Testing_Clan` and `.faust api clanmembers
   Testing_Clan 1`. Repro clan: `Testing_Clan` (2 members, leader PerpetualChaos).
+
+## 13. ✅ FIXED (Faust 0.16.0) — `.faust admin data status` reply overflows VCF's 512-byte cap (throws server-side)
+
+> **Delivered:** Faust now chunks the `data status` reply so each `ctx.Reply` stays under the cap. Raphael's
+> **Faust → Admin: Control → "Data status"** button works (the original ask, below, is kept for the record).
+
+
+Clicking **Faust → Admin: Control → "data status"** in Raphael sends `.faust admin data status`; Faust throws and
+the player gets a VCF error instead of the footprint readout. The reply never reaches the wire — this is purely
+server-side in `Commands/AdminDataCommands.Status`, which builds a multi-line `StringBuilder` (~600–700 bytes) and
+passes it to `ctx.Reply(...)`. VCF converts the string to `Unity.Collections.FixedString512Bytes`, which is capped
+at 512 bytes and **throws `ArgumentException: Truncation while copying`** rather than truncating silently. Verbatim
+from the user's log:
+```
+[Warning:VampireCommandFramework] Hit unexpected exception executing command status
+: System.Reflection.TargetInvocationException → Il2CppException:
+  System.ArgumentException: FixedString512Bytes: Truncation while copying "Faust data — namespace: (shared); on disk ~11 KB; retention: keep forever.
+    Activity: 63 session(s), 124 concurrency point(s), 18 region sample(s), 3 name(s); oldest record 2026-06-09 UTC. Online now: 1.
+    Collection: SessionTracking=on, ConcurrencySampling=on.
+    Unlocks: 0 player(s), 0 V-blood defeat(s), 0 grant(s). Usage locks: 0 pair(s); usage tally: 22 bucket(s).
+    Heatmap: collecting every 60s; 14 cell(s) over 2 player(s), 125 sample(s).
+    Manage: '.faust admin data clear <days>' (prune old acti"
+  at Unity.Collections.FixedString512Bytes..ctor (System.String source)
+  at VampireCommandFramework.ChatCommandContext.Reply (System.String v)
+  at Faust.Commands.AdminDataCommands.Status (ChatCommandContext ctx)
+```
+- **The reply grows with server activity** — more sessions / heatmap cells / usage buckets push it past 512 bytes,
+  so on a populated server `data status` is effectively always broken (a fresh server with tiny counts may squeak
+  under and appear to work).
+- **Ask:** chunk the reply so **each individual `ctx.Reply` call stays under ~500 bytes**. The cleanest fix is one
+  `ctx.Reply` per logical line (the header, Activity, Collection, Unlocks, Heatmap, and Manage lines are already
+  separate `AppendLine`s) instead of a single `ctx.Reply(sb.ToString())`. This is a **general VCF hazard** — any
+  `.faust admin …` (or `.faust api …` non-wire) reply that can exceed 512 bytes will throw the same way; audit the
+  other admin replies (`admin status` with many features, `admin unlocks`) for the same pattern.
+- **Raphael cannot work around this** — the throw happens before any `[FAUST:*]` text is produced, so there is
+  nothing on the wire for Raphael to read, page, or shorten. Must be fixed in Faust.
+
+## 14. ✅ DELIVERED (Faust 0.16.0 / api 18) — retire the `objectscan` feature key (client scan removed/banned)
+
+> **Delivered:** Faust dropped `objectscan` from the handshake, the `[FAUST:access]` list, `.faust admin
+> status`, and its config section (api 18). Raphael already ignored the token (removed from `FeatureKeys`).
+
+
+The client-side **Nearby Objects** scan was removed from Raphael (banned by the V Rising community; scrubbed in
+Raphael v0.51.0). Raphael no longer parses or displays an `objectscan` feature anywhere. But Faust still advertises
+`objectscan=<acc>:<cost>` in the `[FAUST:version]` handshake (contract §2) and still lists it in
+`.faust admin status` (which iterates `Settings.Features.Keys`), so an admin running status from the Raphael button
+still sees `objectscan` as a live feature with no client surface behind it.
+- **Ask:** remove `objectscan` from the advertised feature set — drop it from the handshake feature list, from
+  `Settings.Features`, and from the `admin status` / `access` enumerations (and its config section). If you'd rather
+  keep the server-side accounting, at minimum **stop advertising it in the handshake and the status listing** so it
+  doesn't show up as an open feature in client tooling. Raphael already ignores the token either way (removed it
+  from `FaustProtocolService.FeatureKeys`), so there's no client dependency to coordinate — this is purely so the
+  feature stops appearing in admin output.
+
+## 15. ✅ DELIVERED (Faust 0.16.0 / api 18) — runtime admin controls for cost / cooldown / usage-limit / proximity
+
+> **Delivered both asks.** §15a: `[FAUST:access]` now carries `cd`/`window`/`period`/`maxuses`/`nearprefab`/
+> `neardist` (consumed — the Admin: Oversight access table gained a **Gates** column). §15b: a full live
+> config editor — `.faust admin set/get/resetcfg <feature> <setting> <value>` + `setglobal`/`getglobal` —
+> consumed in **Faust → Admin: Control → Live config editor** (per-feature + global cyclers + value input).
+> Mapping of the originally-proposed verbs onto Faust's editor: `cost` → `set <f> costitem`/`costqty`;
+> `cooldown` → `set <f> cooldown`; `limit` → `set <f> maxuses`/`period`/`window`; `near` → `set <f>
+> nearprefab`/`neardist`. The original ask is kept below for the record.
+
+
+Raphael's **Faust → Admin** tabs can only send chat commands. Today the per-feature **cost** (`CostItemGuid` /
+`CostQuantity`), **cooldown** (`CooldownSeconds`), **usage rate limit** (`WindowSeconds` / `PeriodSeconds` /
+`MaxUsesPerPeriod`), and **proximity requirement** (`RequireNearPrefab` / `RequireNearDistance`) are **config-file
+only** — there's no `.faust admin …` command to set them at runtime, and the `[FAUST:access]` row reports only
+`cost=` (not cooldown / window / period / max-uses / proximity). So Raphael can neither **set** these gates from the
+admin UI nor fully **display** them. Two asks, either/both:
+- **15a — report the gates on `[FAUST:access]`.** Extend the access row with the configured non-cost gates so
+  Raphael can show them read-only, e.g.:
+  ```
+  [FAUST:access] feature=<name> scope=<…> cost=<itemGuid>x<qty> cd=<secs> window=<secs> period=<secs> maxuses=<n> nearprefab=<guid> neardist=<m> granted=<n> unlocked=<n>
+  ```
+  (Omit/`0` when unset; older Raphael ignores unknown tokens.) This alone lets the Faust → Admin: Oversight tab
+  surface the full gate picture per feature.
+- **15b — runtime setters (chat commands).** Optional but enables Raphael to actually configure gates without an
+  admin editing the .cfg + restarting, e.g.:
+  ```
+  .faust admin cost     <feature|all> <itemGuid> <qty>          (0 0 = free)
+  .faust admin cooldown <feature|all> <seconds>                 (0 = none)
+  .faust admin limit    <feature|all> <maxUses> <periodSecs> [<windowSecs>]   (0 = unlimited)
+  .faust admin near     <feature|all> <prefabGuid> <metres>     (0 = no proximity gate)
+  ```
+  Persist to the same config entries the gates already read. If implemented, Raphael will add cyclers/inputs in
+  Faust → Admin mirroring the existing block/schedule/grant controls. **Until then, Raphael's admin UI is left as-is
+  (these gates remain documented as server-config-only).**
+
+## 16. NOTE (2026-06-13) — boss board reports staged/pooled bosses at a limbo position
+
+On the live `bosses` board, some `status=up` V Bloods report a far-off-map position (observed as
+`x=10000 z=10000`) and a `-` region — these are bosses that exist as a **pooled / staged entity** rather
+than being placed in the world. Raphael now guards this client-side: any boss position beyond ±5000 on
+either axis is treated as "no real map position" (the Loc column shows `—` instead of bogus coordinates),
+so this needs **no Faust change**. Optional server-side nicety for the Faust dev: omit `x`/`z` (and emit
+`region=-`) for a V Blood that isn't actually placed in the world, the same way `status=down` already omits
+them — then the board carries no limbo coordinates at all. Low priority; the client guard already handles it.
+
+## 17. ✅ RESOLVED (Faust 0.16.0) — `.faust admin set` / `setglobal` syntax changed
+
+> **Delivered (different fix than proposed).** Faust's VCF (**0.10.4**) has no `[Remainder]`, so instead of
+> the attribute, the **syntax changed**: the value list now arrives as **one space-free token** of
+> `setting=value` pairs, comma-joined — `set castleinfo costitem=862477668,costqty=100,cooldown=30` /
+> `setglobal heatmapenabled=true`. **Raphael updated** (`FaustClient.AdminSet`/`AdminSetPairs`/`AdminSetGlobal`
+> + the config-editor rows now build `setting=value` comma-joined specs). The original report (space-separated
+> form → "Too many parameters") is kept below for the record.
+
+## 17a. (original report) BUG — `.faust admin set` / `setglobal` error "Too many parameters" (missing `[Remainder]`)
+
+Every `.faust admin set <feature> <setting> <value>` and `.faust admin setglobal <setting> <value>` from
+Raphael's config editor fails with VCF **"Too many parameters: expected 2, got N"** — confirmed from the
+client diag log (Raphael sends a clean, well-formed command, e.g. `>> .faust admin set castleinfo costitem
+862477668 costqty 100`). **Raphael is correct; this is a Faust-side VCF signature bug.**
+
+Root cause: `AdminCommands.Set(ChatCommandContext ctx, string feature, string settingsAndValues)` (and
+`SetGlobal(ChatCommandContext ctx, string settingsAndValues)`) rely on VCF passing the *rest of the line* into
+the trailing `settingsAndValues` string — but VCF only does that when the parameter is decorated with
+**`[Remainder]`** (`VCF.Core/Registry/CommandRegistry.cs::IsRemainderParameter` → requires
+`RemainderAttribute`). Without it, VCF uses exact arg-count matching, and `set <feature> <setting> <value>`
+(3+ args for a 2-param method) hits `CommandRegistry.TryConvertParameters` line ~418: `if (argCount >
+paramsCount) return "Too many parameters…"`. So the editor is broken for **every** input, including a single
+`setting value` pair. `[Remainder]` is used nowhere in the Faust codebase.
+
+**Fix (Faust-side, one line each):** add `[Remainder]` to the trailing string parameter:
+```csharp
+public static void Set(ChatCommandContext ctx, string feature, [Remainder] string settingsAndValues)
+public static void SetGlobal(ChatCommandContext ctx, [Remainder] string settingsAndValues)
+```
+(`[Remainder]` lives in the `VampireCommandFramework` namespace, already imported.) `get`/`getglobal`/`resetcfg`
+take single tokens and are unaffected. After this, Raphael's existing combined command
+(`set <feature> costitem <g> costqty <q>`) works unchanged — Raphael needs no change.
+
+## C1. ✅ DELIVERED (Faust 0.16.0 / api 18) — `worldscan` world-asset map — consumed (Faust → World Map tab)
+
+New server-side feature (the user's request): `.faust api worldscan [spec] [page]` returns a filtered map of
+**NPC units** (+ blood type / quality, hp) and **resource nodes** — whitelisted prefabs only, V Bloods excluded,
+cached/rate-limited. `spec` is a single space-free `type=…,id=…,bloodtype=…,bloodqmin=…` token. Wire:
+`[FAUST:asset] guid name kind=<unit|node> x z region [hp hpmax] [bloodtype bloodq]` + optional `[FAUST:note]
+truncated=1` + `[FAUST:end] cmd=worldscan`. **Consumed in Raphael's new World Map tab**: type/id/blood-type/
+blood-quality≥ filters, a results table, an X/Z dot map (units coloured by blood quality, nodes green), the
+truncated warning, and the whitelist admin controls (`.faust admin worldscan list/add/remove/clear/seed`).
+Compliance note: this is **server-side** scanning (Faust scans, Raphael only renders the wire data) — distinct
+from the banned client-side scan; see [[scan-feature-banned-appeal]].
+
+**Follow-up consumed in Raphael 0.56.0** (the rest of the api-18 worldscan batch): the asset rows' optional
+`unittype=<int>` (EntityCategory.UnitCategory) and `restier=<int>` (EntityCategory.ResourceLevel) are now read
+(`FaustAsset.UnitType/ResTier`) and shown in the table Kind column (`c<cat>` / `t<tier>`) + map tooltips; a
+**Unit category** filter feeds `unittype=` into the spec; and the **Prefab lookup & diagnostics** card drives
+`.faust admin prefab <id|name>` (resolve/search a GUID for the whitelist / cost / proximity fields) and
+`.faust admin worldscandiag <fragment>` (audit a prefab's category numbers + Faust's unit/node verdict) — both
+admin chat, replies shown in chat. The ±5000 boss-coord guard (§16) is now redundant but kept as harmless
+insurance.
+
+## 18. NOTE (2026-06-13) — boss board: many never-defeated V Bloods report `status=down` (Faust live-detection)
+
+On `.faust api bosses`, a large share of the roster comes back as `status=down defeated=0` — including V Bloods
+the admin believes are live in the world. Verified from the client diag log: Raphael fetches **all** pages
+(`page=1/3 … page=3/3 count=52`) and renders exactly what Faust sends, so this is **not** a Raphael paging/parse
+issue — the wire literally says `status=down` for those guids (e.g. `CHAR_Bandit_StoneBreaker_VBlood`,
+`CHAR_Forest_Wolf_VBlood`, `CHAR_Militia_Guard_VBlood`). Live ones correctly carry `status=up` + coords/hp/level.
+
+A **never-defeated** (`defeated=0`) boss that is **not** a placed world entity is the puzzle — for a persistent
+overworld V Blood it would normally be standing in its area. Likely Faust-side angles for the dev to check in
+`BossService.GetBosses`: (a) the `MapLimit` (±5000) placed-vs-pooled threshold vs. the real spawn coordinates;
+(b) whether the placed instance for those guids is found by the `VBloodUnit` + `VBloodConsumeSource` + `Health>0`
++ `LocalToWorld` filter (e.g. excluded by `VBloodConsumeSource`); (c) the placed-wins-over-pooled dedup when the
+pooled and placed instances differ. No Raphael change needed — it already shows whatever Faust classifies.
+
+**✅ RESOLVED — Faust 0.16.1 / Raphael v0.57.2.** `.faust admin bossdiag` proved the V Rising map extends well
+past ±5000 and that streamed-out V Bloods keep their **real** positions (there is **no** ~10000 sentinel-parking —
+the old §16 assumption was wrong). Faust raised its live/down cutoff `[Faust.Bosses] MapLimit` to **default 9000**
+(config range to 20000; live-tunable via `.faust admin setglobal bossmaplimit=N`), so all live bosses now report
+`up` with coordinates. **Raphael action done (v0.57.2 → fully in v0.58.1):** the old §16 ±5000 client-side coord guard was first raised
+to 9990 (0.57.2) then **removed entirely** (0.58.1, per contract commit be491f2) — `FaustBoss.OnMap == HasPos`, so
+Raphael fully trusts Faust's coords (Faust only emits coords for `up` bosses within its tunable MapLimit; sentinel
+bosses come as `down` with no coords). This is future-proof if an admin raises MapLimit past 9990. The
+Boss-map-limit control default/range were updated to 9000/20000 and the config-editor `bossmaplimit` hint
+refreshed. **No further Raphael change pending.** ⚠️ A board still half-"Not spawned" = the SERVER isn't running
+the fixed Faust: latest log handshake still `plugin=0.16.0`, boss split unchanged (25 up/27 down). The 0.16.1
+MapLimit→9000 fix must be built (bump Faust's csproj, still 0.16.0) and deployed to the GAME SERVER + restarted.
+
+**§18b ⚠️ RE-TEST: Faust 0.16.1 fix did NOT resolve it (filed back to contract §18b).** Server is now confirmed on
+`plugin=0.16.1`, but `.faust api bosses` is byte-identical (still count=52, 25 up/27 down, SAME roaming set down).
+Raphael re-verified correct: fetches all 3 pages, accumulates all 52, no guard, names verified — so reading
+`Translation` first did NOT catch these bosses (for them Translation is also absent/off-map → entity not
+instantiated). Faust next step: `bossdiag` a still-down map-central boss, read `LTW[on/off]·TR[on/off]`; if both
+off, only spawn-zone/map-icon data helps. **No Raphael change — Raphael displays whatever Faust reports.**
+
+**§18c (Faust 0.16.2) — the "combine," no Raphael change.** Faust now keeps boss status/HP/level from the combat
+entity and fills the location from the game's own map-token tracking (`Script_BloodAltar_TrackVBloodUnit_Shared`
+then the V Blood map icon) when the combat entity is off-map. Wire unchanged, ApiVersion stays 18 — Raphael just
+receives coords for more roamers once the server runs 0.16.2. (Latest log still shows server `plugin=0.16.1`, so
+not deployed yet — needs server rebuild/restart, confirm `plugin=0.16.2`.) Raphael 0.59.1 only refreshed the
+boss-tab note to reference 0.16.2.
+
+**Worldscan result cap (Faust 0.16.1) — consumed in Raphael 0.59.1.** Faust raised `[Faust.WorldScan] MaxResults`
+2000→10000 (0=unlimited, `setglobal worldscanmaxresults`). Raphael added `worldscanmaxresults` to the config-editor
+globals and a **client-side page-chase cap of 5000 rows** (`WORLDSCAN_ROW_CAP`) surfaced via the existing
+truncated notice, so an unbounded scan can't page hundreds of times / render tens of thousands of dots.
+
+**Re-verified 2026-06-13 (Raphael v0.57.0), fresh diag log:** the last full `bosses` fetch was `count=52` split
+**25 `status=up`** (with real coords/hp/level — e.g. `CHAR_Bandit_Stalker_VBlood x=-1682.6 z=-1402.0`,
+`CHAR_Manticore_VBlood`, `CHAR_Winter_Yeti_VBlood`) and **27 `status=down`** (no coords — e.g.
+`CHAR_Bandit_Foreman_VBlood`, `CHAR_Forest_Wolf_VBlood`, `CHAR_Poloma_VBlood`, `CHAR_Wendigo_VBlood`,
+`CHAR_Undead_BishopOfDeath_VBlood`). Raphael paged 1/3→3/3 and rendered all 52 — confirmed **not** a Raphael
+issue. Raphael added a **"Diagnose detection (admin)"** button on Faust → Boss Status that fires
+`.faust admin bossdiag [name|guid]` (targets the lookup box, or blank = all) so the admin can dump each VBlood
+entity's pooled/placed state for the Faust-side fix. The §16 ±5000 client guard remains redundant-but-harmless.

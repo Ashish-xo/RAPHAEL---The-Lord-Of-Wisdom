@@ -68,6 +68,8 @@ public partial class MainPanel : ResizeablePanelBase
     private Toggle _xpOverlayToggle;
     private Toggle _famOverlayToggle;
     private Toggle _famBrowserToggle;
+    private Toggle _quickSpawnOverlayToggle; // 0.53: footer quick-toggle for the Familiar Quick Spawn overlay
+    private Toggle _bossTrackerOverlayToggle; // 0.54: footer quick-toggle for the Faust boss-tracker overlay
     private Toggle _dqOverlayToggle;
     private Toggle _profOverlayToggle;
     private Toggle _shiftOverlayToggle;
@@ -360,6 +362,9 @@ public partial class MainPanel : ResizeablePanelBase
                 (PanelType.FaustClansTab,        "Clans"),
                 (PanelType.FaustPositionsTab,    "Player Positions"),
                 (PanelType.FaustStatsTab,        "Server Stats"),
+                (PanelType.FaustBossesTab,       "Boss Status"),
+                (PanelType.FaustKillsTab,        "Leaderboards"),
+                (PanelType.FaustWorldScanTab,    "World Map"),
                 (PanelType.FaustSettingsTab,     "Settings"),
                 (PanelType.FaustAdminControlTab, "Admin: Control"),
                 (PanelType.FaustAdminAccessTab,  "Admin: Access"),
@@ -2013,6 +2018,15 @@ public partial class MainPanel : ResizeablePanelBase
                 case PanelType.FaustStatsTab:
                     BuildFaustStatsTab(page);
                     break;
+                case PanelType.FaustBossesTab:
+                    BuildFaustBossesTab(page);
+                    break;
+                case PanelType.FaustKillsTab:
+                    BuildFaustKillsTab(page);
+                    break;
+                case PanelType.FaustWorldScanTab:
+                    BuildFaustWorldScanTab(page);
+                    break;
                 case PanelType.FaustSettingsTab:
                     BuildFaustSettingsTab(page);
                     break;
@@ -2093,8 +2107,6 @@ public partial class MainPanel : ResizeablePanelBase
             "Planned for this section:\n" +
             "• Tabbed chat — split Global / Local / Clan / System / whisper into " +
             "separate channels in the in-game chat.\n" +
-            "• Resource markers — high-contrast, colorblind-friendly indicators for " +
-            "[redacted] nodes.\n" +
             "• Map info — castle-heart timers and plot size / availability on the map.");
 
         // 0.17 increment 1: early preview of the tabbed chat window (read-only).
@@ -6036,7 +6048,7 @@ public partial class MainPanel : ResizeablePanelBase
         AddGuideSection(page,
             "Faust  —  server investigation & analytics",
             "Powers the FAUST group: castle / plot / decay reporting, player positions, server-stats " +
-            "charts, clan rosters, and the [redacted]s.");
+            "charts, clan rosters, and activity heat maps.");
         AddSpacer(page, 12);
 
         // ── Region 3 ─────────────────────────────────────────────────────
@@ -6142,6 +6154,14 @@ public partial class MainPanel : ResizeablePanelBase
         AddTransparencyRow(transCard, "Familiar Browser",
             () => Config.Settings.FamiliarBrowserTransparency,
             v => Config.Settings.SetFamiliarBrowserTransparency(v));
+        // 0.53: Familiar Quick Spawn overlay transparency.
+        AddTransparencyRow(transCard, "Quick Spawn",
+            () => Config.Settings.FamiliarQuickSpawnOverlayTransparency,
+            v => Config.Settings.SetFamiliarQuickSpawnOverlayTransparency(v));
+        // 0.54: Faust boss-tracker overlay transparency.
+        AddTransparencyRow(transCard, "Boss Tracker",
+            () => Config.Settings.FaustBossTrackerOverlayTransparency,
+            v => Config.Settings.SetFaustBossTrackerOverlayTransparency(v));
         AddTransparencyRow(transCard, "Daily quest",
             () => Config.Settings.DailyQuestTransparency,
             v => Config.Settings.SetDailyQuestTransparency(v));
@@ -7436,6 +7456,8 @@ public partial class MainPanel : ResizeablePanelBase
         if (_xpOverlayToggle       != null) _xpOverlayToggle.SetIsOnWithoutNotify(Plugin.UIManager?.IsOverlayOpen(PanelType.ExperienceOverlay) ?? false);
         if (_famOverlayToggle      != null) _famOverlayToggle.SetIsOnWithoutNotify(Plugin.UIManager?.IsOverlayOpen(PanelType.FamiliarOverlay) ?? false);
         if (_famBrowserToggle      != null) _famBrowserToggle.SetIsOnWithoutNotify(Plugin.UIManager?.IsOverlayOpen(PanelType.FamiliarBrowserOverlay) ?? false);
+        if (_quickSpawnOverlayToggle != null) _quickSpawnOverlayToggle.SetIsOnWithoutNotify(Plugin.UIManager?.IsOverlayOpen(PanelType.FamiliarQuickSpawnOverlay) ?? false);
+        if (_bossTrackerOverlayToggle != null) _bossTrackerOverlayToggle.SetIsOnWithoutNotify(Plugin.UIManager?.IsOverlayOpen(PanelType.FaustBossTrackerOverlay) ?? false);
         if (_dqOverlayToggle       != null) _dqOverlayToggle.SetIsOnWithoutNotify(Plugin.UIManager?.IsOverlayOpen(PanelType.DailyQuestOverlay) ?? false);
         if (_profOverlayToggle     != null) _profOverlayToggle.SetIsOnWithoutNotify(Plugin.UIManager?.IsOverlayOpen(PanelType.ProfessionOverlay) ?? false);
         if (_shiftOverlayToggle    != null) _shiftOverlayToggle.SetIsOnWithoutNotify(Plugin.UIManager?.IsOverlayOpen(PanelType.ShiftSpellOverlay) ?? false);
@@ -9525,6 +9547,20 @@ public partial class MainPanel : ResizeablePanelBase
         _xpOverlayToggle    = AddOverlayToggle(toggleGrid, "XP",                PanelType.ExperienceOverlay);
         _famOverlayToggle   = AddOverlayToggle(toggleGrid, "Familiar",          PanelType.FamiliarOverlay);
         _famBrowserToggle   = AddOverlayToggle(toggleGrid, "Familiar Browser",  PanelType.FamiliarBrowserOverlay);
+        // 0.53: Familiar Quick Spawn overlay quick-toggle. Independent of Combined mode (like
+        // Familiar Browser / Shift spell), so it always stays visible in the footer.
+        _quickSpawnOverlayToggle = AddOverlayToggle(toggleGrid, "Quick Spawn",  PanelType.FamiliarQuickSpawnOverlay);
+        if (_overlayToggleGOs.TryGetValue(PanelType.FamiliarQuickSpawnOverlay, out var quickSpawnToggleGO))
+        {
+            TooltipHover.Attach(quickSpawnToggleGO,
+                "Toggle the Familiar Quick Spawn overlay — a small movable HUD with up to 5 one-click familiar summons (assigned from the All Familiars tab). Honors the overlay opacity, text-size, transparency and lock controls like every other overlay.");
+        }
+        _bossTrackerOverlayToggle = AddOverlayToggle(toggleGrid, "Boss Tracker", PanelType.FaustBossTrackerOverlay);
+        if (_overlayToggleGOs.TryGetValue(PanelType.FaustBossTrackerOverlay, out var bossTrackerToggleGO))
+        {
+            TooltipHover.Attach(bossTrackerToggleGO,
+                "Toggle the Faust Boss Tracker overlay — a small movable HUD tracking up to 3 V Blood statuses (live / defeated, with HP). Assign bosses and enable ~5s auto-refresh on the Faust → Boss Status tab. Needs a server running Faust 0.16+.");
+        }
         _dqOverlayToggle    = AddOverlayToggle(toggleGrid, "Daily quest",       PanelType.DailyQuestOverlay);
         _profOverlayToggle  = AddOverlayToggle(toggleGrid, "Professions",       PanelType.ProfessionOverlay);
         _shiftOverlayToggle = AddOverlayToggle(toggleGrid, "Shift spell",       PanelType.ShiftSpellOverlay);

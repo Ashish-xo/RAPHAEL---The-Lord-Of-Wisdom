@@ -88,8 +88,15 @@ internal sealed record FaustClan(string Name, int Members, int Online, int Castl
 internal sealed record FaustClanMember(string Name, bool Online, string Role);
 
 /// <summary>Per-feature access snapshot (`access`, api 13, §8e). Unlocked = -1 when the feature has no
-/// unlock criterion (everyone qualifies).</summary>
-internal sealed record FaustAccessRow(string Feature, string Scope, int CostGuid, int CostQty, int Granted, int Unlocked);
+/// unlock criterion (everyone qualifies). The non-cost gate tokens (`Cd`/`Window`/`Period`/`MaxUses`/
+/// `NearPrefab`/`NearDist`) are the §15a additions (api 18) — all 0 = unset; older Faust omits them.</summary>
+internal sealed record FaustAccessRow(string Feature, string Scope, int CostGuid, int CostQty, int Granted, int Unlocked,
+    int Cd = 0, int Window = 0, int Period = 0, int MaxUses = 0, int NearPrefab = 0, float NearDist = 0f)
+{
+    public bool HasCooldown  => Cd > 0;
+    public bool HasLimit     => MaxUses > 0 || Window > 0 || Period > 0;
+    public bool HasProximity => NearPrefab != 0;
+}
 /// <summary>Per-feature usage over a window (`usage`, api 13, §8e).</summary>
 internal sealed record FaustUsageRow(string Feature, int Uses, int Payers, int ItemSpent, int Item, int CooldownHits);
 
@@ -120,9 +127,54 @@ internal sealed record FaustHeatHeader(string Scope, float Cell, int Samples, in
     int MinCx, int MinCz, int MaxCx, int MaxCz, bool Collecting,
     // mapbounds (api 17, §11b): full buildable-map cell extent at this cell size — draw to this for true map
     // scale so a sparse map reads as a few dots on the real outline. Absent on older Faust (HasMapBounds=false).
-    bool HasMapBounds = false, int MapMinCx = 0, int MapMinCz = 0, int MapMaxCx = 0, int MapMaxCz = 0);
+    bool HasMapBounds = false, int MapMinCx = 0, int MapMinCz = 0, int MapMaxCx = 0, int MapMaxCz = 0,
+    // time windows (api 19, Faust 0.16.4): Days = the queried window (0 = all-time), RetentionDays = the server's
+    // per-day history cap (-1 = not sent / older Faust). Cap any window toggle at RetentionDays.
+    int Days = 0, int RetentionDays = -1);
 /// <summary>One occupied heat-map cell: signed cell index (cx,cz) and the sample count (intensity).</summary>
 internal sealed record FaustHeatCell(int Cx, int Cz, int Count);
+
+// ---- V Blood boss board (api 18 / §B1) ----
+/// <summary>One V Blood boss (`bosses`/`boss`, api 18, §B1). `Status` "up" = a live world entity exists right
+/// now (X/Z/Region/Hp/HpMax/HpPct/Level present); "down" = not currently spawned (those live fields omitted →
+/// NaN/-1). `Defeated` = any player on the server has ever killed this V Blood. `Name` is the prefab dev-name
+/// (CHAR_*_VBlood) — prettify by Guid for display.</summary>
+internal sealed record FaustBoss(int Guid, string Name, string Status, bool Defeated,
+    float X = float.NaN, float Z = float.NaN, string Region = "",
+    float Hp = -1f, float HpMax = -1f, int HpPct = -1, int Level = -1)
+{
+    public bool IsUp   => string.Equals(Status, "up", StringComparison.OrdinalIgnoreCase);
+    public bool HasPos => !float.IsNaN(X) && !float.IsNaN(Z);
+    // §18 RESOLVED (Faust 0.16.1) + contract clarification (be491f2): the V Rising map extends well past ±5000
+    // and streamed-out V Bloods keep their REAL positions (no ~10000 sentinel-parking — the old §16 belief was
+    // disproven). Faust decides live/down server-side via its tunable [Faust.Bosses] MapLimit (default 9000, up
+    // to 20000) and ONLY emits coords for a boss it classifies on-map (`up`); off-map/sentinel bosses come as
+    // `down` with no coords (HasPos false). So Raphael fully TRUSTS Faust's coords — no client-side cutoff, which
+    // would otherwise re-hide legitimate far bosses if an admin raises MapLimit. OnMap == HasPos now.
+    public bool OnMap  => HasPos;
+}
+
+// ---- kill leaderboards (api 18 / §B2) ----
+/// <summary>One row of the top-killers board (`kills`, api 18, §B2): total units killed in the window +
+/// `Pvp` = of those, kills where the victim was a player.</summary>
+internal sealed record FaustKillRow(int Rank, long Steam, string Name, int Kills, int Pvp);
+/// <summary>One row of the boss-defeat board (`bosskills`, api 18, §B2): how many times that V Blood was
+/// defeated server-wide in the window. `Name` = prefab dev-name; prettify by `Guid`.</summary>
+internal sealed record FaustBossKillRow(int Rank, int Guid, string Name, int Count);
+
+// ---- world-asset map (api 18 / §C1) ----
+/// <summary>One world-scan asset (`worldscan`, api 18, §C1): an NPC unit or resource node Faust found on the
+/// map (whitelisted prefabs; V Bloods excluded — use `bosses`). `X`/`Z` are world coords (same space as
+/// positions). Units carry `Hp`/`HpMax` (HpMax ≤ 0 = no Health) + `BloodType` (dev-name, "" = none) +
+/// `BloodQuality` (0–100, -1 = none) + `UnitType` (EntityCategory.UnitCategory int, -1 = none). Nodes carry
+/// `ResTier` (EntityCategory.ResourceLevel int, -1 = none) plus guid/name/x/z/region.</summary>
+internal sealed record FaustAsset(int Guid, string Name, bool IsUnit, float X, float Z, string Region,
+    float Hp = -1f, float HpMax = -1f, string BloodType = "", int BloodQuality = -1,
+    int UnitType = -1, int ResTier = -1)
+{
+    public bool HasBlood => BloodQuality >= 0;
+    public bool HasPos   => !float.IsNaN(X) && !float.IsNaN(Z);
+}
 
 /// <summary>Lifecycle of a single query slot — drives the per-tab status line.</summary>
 internal enum FaustQueryStatus { Idle, Loading, Ready, Empty, Error }
@@ -138,7 +190,7 @@ internal static class FaustState
     public static string PluginVersion { get; private set; } = "";
     public static bool   Ready         { get; private set; }
 
-    // feature name (playerpositions|castleinfo|playerinfo|plotavailability|[redacted]|castleresources|stats)
+    // feature name (playerpositions|castleinfo|playerinfo|plotavailability|castleresources|stats)
     //   -> resolved access + cost for THIS player.
     private static readonly Dictionary<string, FaustFeature> _features =
         new(StringComparer.OrdinalIgnoreCase);
@@ -161,6 +213,11 @@ internal static class FaustState
     public static bool SupportsApi14       => ApiVersion >= 14; // §9 drill-downs: newplayers roster, hoursplayers, sessions timeline, activegrid (Faust 0.15)
     public static bool SupportsApi15       => ApiVersion >= 15; // §10: nprow playmins/castles, region plots, stats regiondaily (Faust 0.15)
     public static bool SupportsHeatmap     => ApiVersion >= 16; // player-position heat map: .faust api heatmap (Faust 0.15)
+    public static bool SupportsHeatmapWindows => ApiVersion >= 19; // `.faust api heatmap <scope> <days> <page>` time windows (Faust 0.16.4)
+    public static bool SupportsApi18       => ApiVersion >= 18; // §B1 boss board + §B2 kill leaderboards + §15a access gate tokens + live config editor (Faust 0.16)
+    public static bool SupportsBosses      => ApiVersion >= 18; // `.faust api bosses` / `boss <name|guid>` (V Blood status board)
+    public static bool SupportsKills       => ApiVersion >= 18; // `.faust api kills` / `bosskills` (kill + boss-defeat leaderboards)
+    public static bool SupportsWorldScan   => ApiVersion >= 18; // `.faust api worldscan` (filtered map of units + resource nodes)
 
     // ---- per-query result slots ----
     // castleinfo (#2) — single result.
@@ -345,6 +402,51 @@ internal static class FaustState
     public static int    HeatmapTotalCount { get; private set; }
     public static string HeatmapError { get; private set; } = "";
 
+    // ---- V Blood boss board (api 18 / §B1) ----
+    // bosses — paged status board, page-chased like the other lists.
+    public static FaustQueryStatus BossesStatus { get; private set; } = FaustQueryStatus.Idle;
+    public static IReadOnlyList<FaustBoss> Bosses { get; private set; } = Array.Empty<FaustBoss>();
+    public static int    BossesTotalCount { get; private set; }
+    public static string BossesError { get; private set; } = "";
+    // boss — single-boss lookup (one [FAUST:boss], no end trailer — commits immediately, like castleinfo).
+    public static FaustQueryStatus BossLookupStatus { get; private set; } = FaustQueryStatus.Idle;
+    public static FaustBoss BossLookup { get; private set; }
+    public static string BossLookupQuery { get; private set; } = "";
+    public static string BossLookupError { get; private set; } = "";
+    // Cache of recently single-looked-up bosses (guid → latest), keyed by guid. The boss-tracker overlay
+    // auto-refreshes ONLY its tracked bosses via per-boss lookups (not the whole board) and reads the freshest
+    // status from here. Updated by every `.faust api boss` reply.
+    private static readonly Dictionary<int, FaustBoss> _trackedBosses = new();
+    public static IReadOnlyDictionary<int, FaustBoss> TrackedBosses => _trackedBosses;
+    public static event Action TrackedBossesChanged;
+    internal static void SetTrackedBoss(FaustBoss b)
+    {
+        if (b == null || b.Guid == 0) return;
+        _trackedBosses[b.Guid] = b;
+        Fire(TrackedBossesChanged);
+    }
+
+    // ---- kill leaderboards (api 18 / §B2) ----
+    public static FaustQueryStatus KillsStatus { get; private set; } = FaustQueryStatus.Idle;
+    public static IReadOnlyList<FaustKillRow> Kills { get; private set; } = Array.Empty<FaustKillRow>();
+    public static int    KillsTotalCount { get; private set; }
+    public static int    KillsDays { get; private set; }   // the window the rows belong to (0 = all-time)
+    public static string KillsError { get; private set; } = "";
+
+    public static FaustQueryStatus BossKillsStatus { get; private set; } = FaustQueryStatus.Idle;
+    public static IReadOnlyList<FaustBossKillRow> BossKills { get; private set; } = Array.Empty<FaustBossKillRow>();
+    public static int    BossKillsTotalCount { get; private set; }
+    public static int    BossKillsDays { get; private set; }
+    public static string BossKillsError { get; private set; } = "";
+
+    // ---- world-asset map (api 18 / §C1) ----
+    public static FaustQueryStatus WorldScanStatus { get; private set; } = FaustQueryStatus.Idle;
+    public static IReadOnlyList<FaustAsset> WorldAssets { get; private set; } = Array.Empty<FaustAsset>();
+    public static int    WorldScanTotalCount { get; private set; }
+    public static bool   WorldScanTruncated { get; private set; }   // [FAUST:note] truncated=1 — hit MaxResults
+    public static string WorldScanSpec { get; private set; } = "";  // the filter spec last queried (for the status line)
+    public static string WorldScanError { get; private set; } = "";
+
     // ---- change events ----
     public static event Action PresenceChanged;     // Present / Ready / ApiVersion + feature map
     public static event Action CastleChanged;
@@ -378,6 +480,11 @@ internal static class FaustState
     public static event Action ActiveGridChanged;
     public static event Action RegionDailyChanged;
     public static event Action HeatmapChanged;
+    public static event Action BossesChanged;
+    public static event Action BossLookupChanged;
+    public static event Action KillsChanged;
+    public static event Action BossKillsChanged;
+    public static event Action WorldScanChanged;
 
     // Transient anti-spam notice (e.g. "wait 3s between refreshes"); the UI shows it without disturbing data.
     public static string GateNotice { get; private set; } = "";
@@ -494,6 +601,21 @@ internal static class FaustState
     internal static void SetHeatmap(FaustQueryStatus status, string scope, FaustHeatHeader header, IReadOnlyList<FaustHeatCell> cells, int totalCount, string error = "")
     { HeatmapStatus = status; HeatmapScope = scope ?? ""; HeatmapHeader = header; HeatmapCells = cells ?? Array.Empty<FaustHeatCell>(); HeatmapTotalCount = totalCount; HeatmapError = error ?? ""; Fire(HeatmapChanged); }
 
+    internal static void SetBosses(FaustQueryStatus status, IReadOnlyList<FaustBoss> rows, int totalCount, string error = "")
+    { BossesStatus = status; Bosses = rows ?? Array.Empty<FaustBoss>(); BossesTotalCount = totalCount; BossesError = error ?? ""; Fire(BossesChanged); }
+
+    internal static void SetBossLookup(FaustQueryStatus status, FaustBoss boss, string query, string error = "")
+    { BossLookupStatus = status; BossLookup = boss; BossLookupQuery = query ?? ""; BossLookupError = error ?? ""; Fire(BossLookupChanged); }
+
+    internal static void SetKills(FaustQueryStatus status, IReadOnlyList<FaustKillRow> rows, int days, int totalCount, string error = "")
+    { KillsStatus = status; Kills = rows ?? Array.Empty<FaustKillRow>(); KillsDays = days; KillsTotalCount = totalCount; KillsError = error ?? ""; Fire(KillsChanged); }
+
+    internal static void SetBossKills(FaustQueryStatus status, IReadOnlyList<FaustBossKillRow> rows, int days, int totalCount, string error = "")
+    { BossKillsStatus = status; BossKills = rows ?? Array.Empty<FaustBossKillRow>(); BossKillsDays = days; BossKillsTotalCount = totalCount; BossKillsError = error ?? ""; Fire(BossKillsChanged); }
+
+    internal static void SetWorldScan(FaustQueryStatus status, string spec, IReadOnlyList<FaustAsset> rows, int totalCount, bool truncated, string error = "")
+    { WorldScanStatus = status; WorldScanSpec = spec ?? ""; WorldAssets = rows ?? Array.Empty<FaustAsset>(); WorldScanTotalCount = totalCount; WorldScanTruncated = truncated; WorldScanError = error ?? ""; Fire(WorldScanChanged); }
+
     /// <summary>Clear ALL cached Faust state. Called on logout (FaustProtocolService.Reset via the
     /// relog teardown hook) so a relog into a DIFFERENT server starts clean. PURE field resets — does
     /// NOT fire change events (the teardown hook does no UI work; the UI re-gates on relog when
@@ -535,6 +657,11 @@ internal static class FaustState
         ActiveGridStatus = FaustQueryStatus.Idle; ActiveGrid = Array.Empty<FaustActiveRow>(); ActiveGridTotalCount = 0; ActiveGridError = "";
         RegionDailyStatus = FaustQueryStatus.Idle; RegionDaily = Array.Empty<FaustRegionDay>(); RegionDailyTotalCount = 0; RegionDailyError = "";
         HeatmapStatus = FaustQueryStatus.Idle; HeatmapHeader = null; HeatmapCells = Array.Empty<FaustHeatCell>(); HeatmapScope = ""; HeatmapTotalCount = 0; HeatmapError = "";
+        BossesStatus = FaustQueryStatus.Idle; Bosses = Array.Empty<FaustBoss>(); BossesTotalCount = 0; BossesError = "";
+        BossLookupStatus = FaustQueryStatus.Idle; BossLookup = null; BossLookupQuery = ""; BossLookupError = ""; _trackedBosses.Clear();
+        KillsStatus = FaustQueryStatus.Idle; Kills = Array.Empty<FaustKillRow>(); KillsTotalCount = 0; KillsDays = 0; KillsError = "";
+        BossKillsStatus = FaustQueryStatus.Idle; BossKills = Array.Empty<FaustBossKillRow>(); BossKillsTotalCount = 0; BossKillsDays = 0; BossKillsError = "";
+        WorldScanStatus = FaustQueryStatus.Idle; WorldAssets = Array.Empty<FaustAsset>(); WorldScanTotalCount = 0; WorldScanTruncated = false; WorldScanSpec = ""; WorldScanError = "";
     }
 
     private static void Fire(Action evt)

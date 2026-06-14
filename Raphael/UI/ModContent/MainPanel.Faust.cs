@@ -82,6 +82,11 @@ public partial class MainPanel
         FaustState.ClanMembersChanged    += RefreshFaustClanMembers;
         FaustState.AccessChanged         += RefreshFaustOversight;
         FaustState.UsageChanged          += RefreshFaustOversight;
+        FaustState.BossesChanged         += RebuildFaustBosses;
+        FaustState.BossLookupChanged     += RefreshFaustBossLookup;
+        FaustState.KillsChanged          += RebuildFaustKills;
+        FaustState.BossKillsChanged      += RebuildFaustKills;
+        FaustState.WorldScanChanged      += RefreshFaustWorldScan;
         FaustState.GateNoticeChanged     += RefreshFaustGateNotice;
         _faustSubscribed = true;
     }
@@ -122,6 +127,11 @@ public partial class MainPanel
         FaustState.ClanMembersChanged    -= RefreshFaustClanMembers;
         FaustState.AccessChanged         -= RefreshFaustOversight;
         FaustState.UsageChanged          -= RefreshFaustOversight;
+        FaustState.BossesChanged         -= RebuildFaustBosses;
+        FaustState.BossLookupChanged     -= RefreshFaustBossLookup;
+        FaustState.KillsChanged          -= RebuildFaustKills;
+        FaustState.BossKillsChanged      -= RebuildFaustKills;
+        FaustState.WorldScanChanged      -= RefreshFaustWorldScan;
         FaustState.GateNoticeChanged     -= RefreshFaustGateNotice;
         _faustSubscribed = false;
     }
@@ -201,6 +211,204 @@ public partial class MainPanel
         var input = UIFactory.CreateInputField(row, name, placeholder);
         UIFactory.SetLayoutElement(input.GameObject, minWidth: 130, preferredWidth: 180, flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
         return input;
+    }
+
+    // A compact input added to an EXISTING row (for multi-field "straight-line" forms).
+    private InputFieldRef AddFaustInlineInput(GameObject row, string name, string placeholder, int width = 90)
+    {
+        var input = UIFactory.CreateInputField(row, name, placeholder);
+        UIFactory.SetLayoutElement(input.GameObject,
+            minWidth: Theme.ScaledWidth(width), preferredWidth: Theme.ScaledWidth(width), flexibleWidth: 0,
+            minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
+        return input;
+    }
+
+    // A label caption + DROPDOWN on one row; returns the TMP_Dropdown for value reads / repopulation. options[0]
+    // is typically a placeholder. onChanged fires with the selected index. Mirrors AddFaustLabeledInput's layout.
+    private TMP_Dropdown AddFaustLabeledDropdown(GameObject parent, string name, string caption, string[] options, Action<int> onChanged, int width = 220, Action onReload = null, string reloadTip = null)
+    {
+        var row = MakeFaustRow(parent, name + "Row");
+        var lbl = UIFactory.CreateLabel(row, name + "Label", $"<color={Theme.MutedBodyHex}>{caption}</color>",
+            TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
+        UIFactory.SetLayoutElement(lbl.GameObject, minWidth: 96, preferredWidth: 116, flexibleWidth: 0, minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
+        lbl.TextMesh.enableWordWrapping = false; lbl.TextMesh.overflowMode = TextOverflowModes.Overflow;
+        var go = UIFactory.CreateDropdown(row, name, out var dd,
+            options != null && options.Length > 0 ? options[0] : "—", Theme.ScaledUI(12), onChanged, options);
+        UIFactory.SetLayoutElement(go, minWidth: Theme.ScaledWidth(width), preferredWidth: Theme.ScaledWidth(width), flexibleWidth: 1, minHeight: Theme.ScaledHeight(26), preferredHeight: Theme.ScaledHeight(28), flexibleHeight: 0);
+        FaustDropdownNoWrap(dd);
+        Raphael.UI.Forms.FormDropdownRegistry.Register(dd);
+        // Optional inline "Load" button so the user can always (re)populate the list from the server.
+        if (onReload != null)
+            AddFaustButton(row, name + "Reload", "Load", reloadTip ?? "Load this list from the server.", onReload, 64);
+        return dd;
+    }
+
+    private static void FaustDropdownNoWrap(TMP_Dropdown dd)
+    {
+        try
+        {
+            if (dd == null) return;
+            if (dd.captionText != null) { dd.captionText.enableWordWrapping = false; dd.captionText.overflowMode = TextOverflowModes.Ellipsis; }
+            if (dd.itemText != null)    { dd.itemText.enableWordWrapping    = false; dd.itemText.overflowMode    = TextOverflowModes.Ellipsis; }
+        }
+        catch { }
+    }
+
+    // IL2CPP-safe option repopulation: mutate .options directly (the AddOptions/ClearOptions bridge overloads are
+    // finicky on this Unity build — see UI/Forms/FormField.cs). Self-guards a destroyed dropdown.
+    private static void SetFaustDropdownOptions(TMP_Dropdown dd, System.Collections.Generic.IReadOnlyList<string> opts, int selectIndex)
+    {
+        if (dd == null) return;
+        try { if (dd.gameObject == null) return; } catch { return; }
+        dd.options.Clear();
+        for (int i = 0; i < opts.Count; i++) dd.options.Add(new TMP_Dropdown.OptionData(opts[i]));
+        dd.value = Mathf.Clamp(selectIndex, 0, Mathf.Max(0, opts.Count - 1));
+        dd.RefreshShownValue();
+    }
+
+    // ---- Active-player picker (#3 + cross-cutting) ------------------------------------------------------------
+    // A dropdown of currently-online players (FaustState.Positions) for anywhere a player name / SteamID is typed.
+    // Option 0 is a placeholder; picking a player invokes onPick(steamId, name). It repopulates itself on
+    // FaustState.PositionsChanged (self-detaches when its dropdown is destroyed by a tab rebuild — same pattern as
+    // BoxNameDropdownField) and kicks one `.faust api positions` if the roster is empty so it auto-fills.
+    private static bool _faustPickerKickedPositions;
+
+    private TMP_Dropdown AddFaustPlayerPicker(GameObject parent, string name, string caption, Action<string, string> onPick, int width = 220)
+    {
+        var ids = new System.Collections.Generic.List<string>();     // parallel to dropdown options ([0] = placeholder)
+        var disp = new System.Collections.Generic.List<string>();
+        var dd = AddFaustLabeledDropdown(parent, name, caption, FaustPlayerPickerOptions(ids, disp), idx =>
+        {
+            if (idx <= 0 || idx >= ids.Count) return;
+            try { onPick?.Invoke(ids[idx], disp[idx]); }
+            catch (Exception ex) { LogUtils.LogError($"[Faust] player picker '{name}' threw: {ex}"); }
+        }, width, onReload: () => FaustProtocolService.QueryPositions(),
+           reloadTip: "Load the list of online players (.faust api positions). Admin-default on most servers.");
+
+        Action repop = null;
+        repop = () =>
+        {
+            if (dd == null) { FaustState.PositionsChanged -= repop; return; }
+            try { if (dd.gameObject == null) { FaustState.PositionsChanged -= repop; return; } }
+            catch { FaustState.PositionsChanged -= repop; return; }
+            SetFaustDropdownOptions(dd, FaustPlayerPickerOptions(ids, disp), 0);
+        };
+        FaustState.PositionsChanged += repop;
+
+        // Auto-fill once if the feature isn't fully off. (Don't gate on the "admin" token — admins CAN use
+        // admin-gated features yet the handshake still reports `admin`, so gating on it wrongly left admins with an
+        // empty list. A non-admin just gets one transient denial; the inline Load button is the manual fallback.)
+        if (FaustState.Positions.Count == 0 && !_faustPickerKickedPositions && FaustState.SupportsApi7
+            && !FaustState.Feature("playerpositions").IsOff)
+        {
+            _faustPickerKickedPositions = true;
+            FaustProtocolService.QueryPositions();
+        }
+        return dd;
+    }
+
+    // Rebuild the (id, display) lists + the option strings from the current online roster (sorted by name).
+    private static string[] FaustPlayerPickerOptions(System.Collections.Generic.List<string> ids, System.Collections.Generic.List<string> disp)
+    {
+        ids.Clear(); disp.Clear(); ids.Add(""); disp.Add("");
+        var roster = new System.Collections.Generic.List<FaustPos>(FaustState.Positions);
+        roster.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        var opts = new System.Collections.Generic.List<string>(roster.Count + 1)
+        { roster.Count > 0 ? $"▾ pick from {roster.Count} online…" : "(no players loaded)" };
+        foreach (var p in roster)
+        {
+            string n = string.IsNullOrEmpty(p.Name) ? p.Steam.ToString() : p.Name;
+            ids.Add(p.Steam != 0 ? p.Steam.ToString(System.Globalization.CultureInfo.InvariantCulture) : n);
+            disp.Add(n);
+            opts.Add(n);
+        }
+        return opts.ToArray();
+    }
+
+    // ---- Castle picker (#4) -----------------------------------------------------------------------------------
+    // A dropdown of every territory (FaustState.AllPlots from `.faust api castles`), labelled "#index · region
+    // (x,z) · owner" so the user never has to know an index by heart. Picking one invokes onPick(indexString).
+    // Repopulates on AllPlotsChanged (self-detaches on rebuild) and kicks one `castles` query if the list is empty.
+    private static bool _faustPickerKickedCastles;
+
+    private TMP_Dropdown AddFaustCastlePicker(GameObject parent, string name, Action<string> onPick, int width = 260)
+    {
+        var ids = new System.Collections.Generic.List<string>();   // parallel to options ([0] = placeholder)
+        var dd = AddFaustLabeledDropdown(parent, name, "Castle (index)", FaustCastlePickerOptions(ids), idx =>
+        {
+            if (idx <= 0 || idx >= ids.Count) return;
+            try { onPick?.Invoke(ids[idx]); }
+            catch (Exception ex) { LogUtils.LogError($"[Faust] castle picker '{name}' threw: {ex}"); }
+        }, width, onReload: () => FaustProtocolService.QueryAllCastles(),
+           reloadTip: "Scan every territory to fill this list (.faust api castles). Admin-default on most servers.");
+
+        Action repop = null;
+        repop = () =>
+        {
+            if (dd == null) { FaustState.AllPlotsChanged -= repop; return; }
+            try { if (dd.gameObject == null) { FaustState.AllPlotsChanged -= repop; return; } }
+            catch { FaustState.AllPlotsChanged -= repop; return; }
+            SetFaustDropdownOptions(dd, FaustCastlePickerOptions(ids), 0);
+        };
+        FaustState.AllPlotsChanged += repop;
+
+        // Auto-fill once if the feature isn't fully off (don't gate on the "admin" token — admins can use it; the
+        // inline Load button + the All Plots tab are the manual fallback for non-admins).
+        if (FaustState.AllPlots.Count == 0 && !_faustPickerKickedCastles && FaustState.SupportsAllCastles
+            && !FaustState.Feature("allcastles").IsOff)
+        {
+            _faustPickerKickedCastles = true;
+            FaustProtocolService.QueryAllCastles();
+        }
+        return dd;
+    }
+
+    private static string[] FaustCastlePickerOptions(System.Collections.Generic.List<string> ids)
+    {
+        ids.Clear(); ids.Add("");
+        var rows = new System.Collections.Generic.List<FaustCastle>(FaustState.AllPlots);
+        rows.Sort((a, b) => a.Tindex.CompareTo(b.Tindex));
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        var opts = new System.Collections.Generic.List<string>(rows.Count + 1)
+        { rows.Count > 0 ? $"▾ pick from {rows.Count} territories…" : "(no territories loaded)" };
+        foreach (var c in rows)
+        {
+            string region = string.IsNullOrEmpty(c.Region) || c.Region == "-" ? "open" : c.Region;
+            string pos = c.HasPos ? $" ({c.PosX.ToString("0", ci)}, {c.PosZ.ToString("0", ci)})" : "";
+            string owner = string.IsNullOrEmpty(c.Owner) || c.Unclaimed ? "" : $" · {c.Owner}";
+            ids.Add(c.Tindex.ToString(ci));
+            opts.Add($"#{c.Tindex} · {region}{pos}{owner}");
+        }
+        return opts.ToArray();
+    }
+
+    // Boss-picker options (#2): the live board's bosses (with their guids) merged with the known V Blood list
+    // (guid 0 = not on the board → looked up by name). Sorted A→Z; [0] is the placeholder.
+    private static string[] FaustBossPickerOptions(System.Collections.Generic.List<string> names, System.Collections.Generic.List<int> guids)
+    {
+        names.Clear(); guids.Clear(); names.Add(""); guids.Add(0);
+        var byName = new System.Collections.Generic.SortedDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var b in FaustState.Bosses)
+        {
+            var n = FaustBossNames.Resolve(b.Guid, b.Name);
+            if (!string.IsNullOrEmpty(n) && n != "—") byName[n] = b.Guid;   // board wins (carries a guid)
+        }
+        foreach (var n in FaustBossNames.AllKnownNames) if (!byName.ContainsKey(n)) byName[n] = 0;
+        var opts = new System.Collections.Generic.List<string>(byName.Count + 1)
+        { byName.Count > 0 ? "▾ pick a V Blood…" : "(no bosses known)" };
+        foreach (var kv in byName) { names.Add(kv.Key); guids.Add(kv.Value); opts.Add(kv.Key); }
+        return opts.ToArray();
+    }
+
+    // A compact muted caption added to an EXISTING row (label a field/group in a straight-line form).
+    private void AddFaustInlineLabel(GameObject row, string name, string text, int width = 72)
+    {
+        var l = UIFactory.CreateLabel(row, name, $"<color={Theme.MutedBodyHex}>{text}</color>",
+            TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(11));
+        UIFactory.SetLayoutElement(l.GameObject,
+            minWidth: Theme.ScaledWidth(width), preferredWidth: Theme.ScaledWidth(width), flexibleWidth: 0,
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
+        l.TextMesh.enableWordWrapping = false; l.TextMesh.overflowMode = TextOverflowModes.Overflow;
     }
 
     // One line of a list/results card.
@@ -392,7 +600,10 @@ public partial class MainPanel
         AddFaustButton(row, "FaustCastleNearest", "Nearest",
             "Query the territory of the nearest castle heart (.faust api castleinfo nearest).",
             () => FaustProtocolService.QueryCastle("nearest"), 100);
-        _faustCastleInput = AddFaustLabeledInput(controls, "FaustCastleIdx", "Territory index", "e.g. 42");
+        // #4: pick a territory from a dropdown (index · region · coords) instead of memorising index numbers.
+        AddFaustCastlePicker(controls, "FaustCastlePick", idx =>
+        { if (_faustCastleInput != null) _faustCastleInput.Text = idx; FaustProtocolService.QueryCastle(idx); });
+        _faustCastleInput = AddFaustLabeledInput(controls, "FaustCastleIdx", "…or type index", "e.g. 42");
         var row2 = MakeFaustRow(controls, "FaustCastleLookupRow");
         AddFaustButton(row2, "FaustCastleLookup", "Look up index",
             "Query a specific territory by its index (.faust api castleinfo <index>).",
@@ -594,6 +805,9 @@ public partial class MainPanel
 
     private void RebuildFaustAllPlots()
     {
+        // Once the territory list has loaded, allow castle-pickers to auto-kick another `castles` later if it empties.
+        if (FaustState.AllPlotsStatus == FaustQueryStatus.Ready && FaustState.AllPlots.Count > 0)
+            _faustPickerKickedCastles = false;
         if (_faustAllStatus != null)
             _faustAllStatus.text = StatusColored(FaustState.AllPlotsStatus,
                 $"{FaustState.AllPlotsTotalCount} territory(ies).", FaustState.AllPlotsError,
@@ -777,7 +991,13 @@ public partial class MainPanel
         AddBodyText(intro, FaustFeatureHint("playerinfo"));
 
         var controls = AddCard(page, "FaustPlayerControls");
-        _faustPlayerInput = AddFaustLabeledInput(controls, "FaustPlayerQ", "Name or SteamID", "exact player name…");
+        // #3: pick an online player from a dropdown (or type any name / SteamID below).
+        AddFaustPlayerPicker(controls, "FaustPlayerPick", "Online player", (steam, name) =>
+        {
+            if (_faustPlayerInput != null) _faustPlayerInput.Text = name;
+            FaustProtocolService.QueryPlayer(string.IsNullOrEmpty(steam) ? name : steam);
+        });
+        _faustPlayerInput = AddFaustLabeledInput(controls, "FaustPlayerQ", "…or name / SteamID", "exact player name…");
         var row = MakeFaustRow(controls, "FaustPlayerBtns");
         AddFaustButton(row, "FaustPlayerLookup", "Look up",
             "Look up the typed player (.faust api pinfo <name|steamId>).",
@@ -2592,8 +2812,9 @@ public partial class MainPanel
     }
 
     // ---- heat-map gradient (separate from the bar palette: a cold→hot ramp reads far better than one hue) ----
-    private static readonly string[] FaustHeatGradientNames = { "Theme color", "Heat (red→yellow)", "Green", "Mono (b/w)" };
-    private static string FaustHeatGradientName() => FaustHeatGradientNames[Mathf.Clamp(Config.Settings.FaustHeatGradient, 0, 3)];
+    private static readonly string[] FaustHeatGradientNames =
+        { "Theme color", "Heat (red→yellow)", "Green", "Mono (b/w)", "Magma (map)", "Ice→Fire (map)", "Viridis (map)" };
+    private static string FaustHeatGradientName() => FaustHeatGradientNames[Mathf.Clamp(Config.Settings.FaustHeatGradient, 0, 6)];
     private static readonly string[] FaustHeatDetailNames = { "Native", "Grouped 2×", "Grouped 4×" };
     private static string FaustHeatDetailName() => FaustHeatDetailNames[Mathf.Clamp(Config.Settings.FaustHeatDetail, 0, 2)];
     private static readonly string[] FaustHeatScaleNames = { "Full map", "Zoom to data" };
@@ -2610,6 +2831,24 @@ public partial class MainPanel
         new Color(0.02f, 0.03f, 0.02f), new Color(0.02f, 0.22f, 0.06f), new Color(0.10f, 0.55f, 0.16f),
         new Color(0.40f, 0.92f, 0.40f), new Color(0.85f, 1.00f, 0.85f),
     };
+    // Map-friendly multi-stop ramps with a STRONG cold→hot progression (the old single-hue map schemes barely
+    // varied between "less" and "more"). Each sweeps hue AND brightness, and (with the alpha ramp below) cold cells
+    // stay translucent while hot cells are opaque/bright — so density reads clearly over the world-map art.
+    private static readonly Color[] FaustHeatStopsMagma =      // deep purple → magenta → orange → cream
+    {
+        new Color(0.12f, 0.05f, 0.25f), new Color(0.45f, 0.08f, 0.45f), new Color(0.78f, 0.18f, 0.45f),
+        new Color(0.98f, 0.45f, 0.22f), new Color(1.00f, 0.92f, 0.70f),
+    };
+    private static readonly Color[] FaustHeatStopsIceFire =    // blue → cyan → white → amber → red (max variation)
+    {
+        new Color(0.15f, 0.30f, 0.85f), new Color(0.15f, 0.75f, 0.95f), new Color(0.95f, 0.97f, 0.95f),
+        new Color(1.00f, 0.78f, 0.20f), new Color(0.93f, 0.22f, 0.16f),
+    };
+    private static readonly Color[] FaustHeatStopsViridis =    // dark purple → blue → teal → green → yellow
+    {
+        new Color(0.27f, 0.00f, 0.33f), new Color(0.23f, 0.32f, 0.55f), new Color(0.13f, 0.57f, 0.55f),
+        new Color(0.37f, 0.79f, 0.38f), new Color(0.99f, 0.91f, 0.20f),
+    };
     private static Color FaustHeatMultiLerp(float t, Color[] stops)
     {
         if (stops.Length == 1) return stops[0];
@@ -2623,17 +2862,25 @@ public partial class MainPanel
     {
         t = Mathf.Clamp01(t);
         Color c;
-        switch (Mathf.Clamp(Config.Settings.FaustHeatGradient, 0, 3))
+        bool mapScheme = false;
+        switch (Mathf.Clamp(Config.Settings.FaustHeatGradient, 0, 6))
         {
             case 1: c = FaustHeatMultiLerp(t, FaustHeatStopsHeat); break;
             case 2: c = FaustHeatMultiLerp(t, FaustHeatStopsGreen); break;
             case 3: c = new Color(t, t, t); break;                                   // mono black→white
+            // Map-friendly multi-stop ramps (strong cold→hot variation; see arrays above).
+            case 4: c = FaustHeatMultiLerp(t, FaustHeatStopsMagma);   mapScheme = true; break;   // magma
+            case 5: c = FaustHeatMultiLerp(t, FaustHeatStopsIceFire); mapScheme = true; break;   // ice→fire
+            case 6: c = FaustHeatMultiLerp(t, FaustHeatStopsViridis); mapScheme = true; break;   // viridis
             default:                                                                // theme: black → the chart's hi colour
                 var p = FaustChartPalette[Mathf.Clamp(Config.Settings.FaustChartColor, 0, 5)];
                 c = Color.Lerp(new Color(0.02f, 0.02f, 0.04f), p.hi, t);
                 break;
         }
-        c.a = 0.92f;
+        // Scale opacity with intensity so the underlying map shows through faint cells. Map schemes ramp alpha
+        // widely (cold = translucent "less", hot = opaque "more") which — with the multi-stop colour sweep above —
+        // makes the less→more difference clearly visible; the classic ramps stay closer to solid.
+        c.a = mapScheme ? Mathf.Lerp(0.45f, 1.00f, t) : Mathf.Lerp(0.55f, 0.95f, t);
         return c;
     }
 
@@ -2980,36 +3227,6 @@ public partial class MainPanel
             () => { _faustPosSortByTerritory = true; RebuildFaustPositions(); }, 120);
         _faustPosStatus = AddBodyText(controls, "—", Theme.ScaledUI(11));
 
-        // Native in-game map markers (admin) — server-side via Faust's `.faust admin showpositions`. The SERVER
-        // attaches the real networked MapIcons to online players, so they render on the M-key map; the client
-        // can't fake these safely. Experimental: requires the server config [Faust.MapMarkers] Enabled=true,
-        // and the marker visibility model (admin-only vs ally-visible) is still being finalized server-side.
-        var mapCard = AddCard(page, "FaustPosMapCard");
-        AddSectionHeading(mapCard, "Show players on map (admin · experimental)");
-        AddBodyText(mapCard,
-            "Tells <b>Faust (the server)</b> to pin native map icons on every online player, visible on the " +
-            "<b>M-key map</b>. <b>On</b> turns it on; open your map to see them. <color=#FFB070>Requires the " +
-            "server config <b>[Faust.MapMarkers] Enabled = true</b></color> — if Faust replies that it's disabled, " +
-            "an admin must enable it server-side and reload. Reply appears in chat. <i>Experimental: marker " +
-            "visibility (admin-only vs everyone) is still being finalized in Faust.</i>");
-        var mr = MakeFaustRow(mapCard, "FaustPosShowRow");
-        AddFaustButton(mr, "FaustPosShowOn", "Show on map: ON",
-            "Attach map icons to all online players (.faust admin showpositions on). Then open the M-key map.",
-            () => FaustClient.AdminShowPositions("on"), 150);
-        AddFaustButton(mr, "FaustPosShowOff", "OFF",
-            "Remove the map icons (.faust admin showpositions off).",
-            () => FaustClient.AdminShowPositions("off"), 80);
-        AddFaustButton(mr, "FaustPosShowStatus", "Status",
-            "Ask whether map markers are currently on + the server's MapMarkers config (.faust admin showpositions status).",
-            () => FaustClient.AdminShowPositions("status"), 90);
-        if (Config.Settings.FaustDiagnostics)
-        {
-            var mapRow = MakeFaustRow(mapCard, "FaustPosMapRow");
-            AddFaustButton(mapRow, "FaustPosMapProbe", "Probe map icons (diag)",
-                "Developer DIAGNOSTIC only — it does NOT show icons. It logs the game's map-icon component setup to LogOutput.log (read-only). Use “Show on map: ON” above to actually display markers.",
-                () => { try { Services.Faust.FaustMapProbe.Probe(); } catch { } }, 180);
-        }
-
         // Player-position HEAT MAP (api 16) — a density grid built from periodic position samples. Server-wide
         // or per-player. Admin-gated + opt-in collection ([Faust.Heatmap] Enabled).
         if (FaustState.SupportsHeatmap)
@@ -3028,31 +3245,89 @@ public partial class MainPanel
                 "<i>groups</i> cells coarser; to make it <i>finer</i>, an admin lowers <b>[Faust.Heatmap] CellSize</b> " +
                 "server-side (then wipe the old heat data). Use <b>Colors</b> for the cold→hot ramp.</color>");
             AddBodyText(heatCard, FaustFeatureHint("heatmap"));
+
+            // View toggle: aggregated HEAT MAP (history) vs a live snapshot of WHERE ONLINE PLAYERS ARE RIGHT NOW
+            // (dots + names), both drawn on the same calibrated map underlay.
+            var vrow = MakeFaustRow(heatCard, "FaustHeatViewRow");
+            AddFaustInlineLabel(vrow, "FaustHeatViewLbl", "View:", 48);
+            _faustHeatViewBtn = AddFaustButton(vrow, "FaustHeatView", FaustHeatViewLabel(),
+                "Switch between the activity HEAT MAP (aggregated history) and PLAYERS NOW — a live snapshot of where " +
+                "each online player is, plotted on the same map with their names. Use “Refresh positions” at the top to update it.",
+                () => {
+                    _faustHeatViewIdx = (_faustHeatViewIdx + 1) % 2;
+                    SetFaustButtonText(_faustHeatViewBtn, FaustHeatViewLabel());
+                    if (_faustHeatViewIdx == 1 && FaustState.Positions.Count == 0 && !FaustState.Feature("playerpositions").IsOff)
+                        FaustProtocolService.QueryPositions();
+                    RefreshFaustHeatmap();
+                }, 170);
+            AddFaustBoolToggle(heatCard, "FaustPosLabels", "Show player name labels (Players-now view)",
+                _faustPosShowLabels,
+                v => { _faustPosShowLabels = v; if (_faustHeatViewIdx == 1) RefreshFaustHeatmap(); },
+                "In the live “Players now” view, label each dot with the player's name. Turn off if it gets crowded — names are always available on hover.");
+
             var hrow = MakeFaustRow(heatCard, "FaustHeatBtns");
             AddFaustButton(hrow, "FaustHeatServer", "Server heat map",
                 "The whole server's aggregated activity density (.faust api heatmap all).",
-                () => FaustProtocolService.QueryHeatmap(""), 150);
-            _faustHeatInput = AddFaustLabeledInput(heatCard, "FaustHeatQ", "Player", "name or SteamID…");
+                () => QueryHeatWithWindow(""), 150);
+            // #3: pick an online player for the per-player heat map (or type any name / SteamID below).
+            AddFaustPlayerPicker(heatCard, "FaustHeatPick", "Online player", (steam, name) =>
+            {
+                if (_faustHeatInput != null) _faustHeatInput.Text = string.IsNullOrEmpty(steam) ? name : steam;
+                QueryHeatWithWindow(_faustHeatInput?.Text?.Trim() ?? name);
+            });
+            _faustHeatInput = AddFaustLabeledInput(heatCard, "FaustHeatQ", "…or name / SteamID", "name or SteamID…");
             var hrow2 = MakeFaustRow(heatCard, "FaustHeatBtns2");
             AddFaustButton(hrow2, "FaustHeatPlayer", "This player's heat map",
                 "One player's activity density (.faust api heatmap <player>). Type a name or SteamID above.",
-                () => { var s = _faustHeatInput?.Text?.Trim(); if (!string.IsNullOrEmpty(s)) FaustProtocolService.QueryHeatmap(s); }, 180);
+                () => { var s = _faustHeatInput?.Text?.Trim(); if (!string.IsNullOrEmpty(s)) QueryHeatWithWindow(s); }, 180);
+
+            // Time-window toggle (api 19 / Faust 0.16.4) — re-query the current heat map for a rolling window.
+            if (FaustState.SupportsHeatmapWindows)
+                _faustHeatWindowBtn = AddFaustButton(hrow2, "FaustHeatWindow", $"When: {FaustHeatWindowLabel()}",
+                    "Cycle the time window: All-time → Today → This week → This month. Re-queries the current heat map. " +
+                    "Windows longer than the server's retention just sum what's kept (Faust 0.16.4+).",
+                    () => {
+                        _faustHeatWindowIdx = (_faustHeatWindowIdx + 1) % FaustHeatWindows.Length;
+                        SetFaustButtonText(_faustHeatWindowBtn, $"When: {FaustHeatWindowLabel()}");
+                        if (FaustState.HeatmapStatus == FaustQueryStatus.Ready || FaustState.HeatmapStatus == FaustQueryStatus.Empty)
+                            QueryHeatWithWindow(_faustHeatLastTarget);
+                    }, 160);
 
             // Appearance — live cyclers (also in Faust → Settings → Heat map). Re-render immediately so the
             // colour ramp / detail change is visible without re-querying the server.
             var hrow3 = MakeFaustRow(heatCard, "FaustHeatAppearRow");
             ButtonRef gradBtn = null;
             gradBtn = AddFaustButton(hrow3, "FaustHeatGrad", $"Colors: {FaustHeatGradientName()}",
-                "Cycle the heat-map color ramp: Theme → Heat (red→yellow) → Green → Mono (black & white). Low traffic = dark, high traffic = bright.",
-                () => { Config.Settings.SetFaustHeatGradient((Config.Settings.FaustHeatGradient + 1) % 4); SetFaustButtonText(gradBtn, $"Colors: {FaustHeatGradientName()}"); RefreshFaustHeatmap(); }, 190);
+                "Cycle the heat-map color ramp: Theme → Heat → Green → Mono → Magma → Ice→Fire → Viridis. The last three are tuned for reading on top of the world-map image (wide cold→hot variation). Low traffic = faint, high traffic = bright.",
+                () => { Config.Settings.SetFaustHeatGradient((Config.Settings.FaustHeatGradient + 1) % 7); SetFaustButtonText(gradBtn, $"Colors: {FaustHeatGradientName()}"); RefreshFaustHeatmap(); }, 190);
             ButtonRef detBtn = null;
             detBtn = AddFaustButton(hrow3, "FaustHeatDetail", $"Detail: {FaustHeatDetailName()}",
                 "Cycle render detail: Native (Faust's finest cell) → Grouped 2× → Grouped 4×. Grouping merges cells into bigger blobs to smooth sparse data; it can't go finer than the server's cell size.",
                 () => { Config.Settings.SetFaustHeatDetail((Config.Settings.FaustHeatDetail + 1) % 3); SetFaustButtonText(detBtn, $"Detail: {FaustHeatDetailName()}"); RefreshFaustHeatmap(); }, 160);
-            ButtonRef scaleBtn = null;
-            scaleBtn = AddFaustButton(hrow3, "FaustHeatScale", $"Scale: {FaustHeatScaleName()}",
-                "Full map = draw to the whole buildable-map bounds (true scale, sparse data = a few dots on the real outline; needs Faust 0.15+/api 17). Zoom to data = size the grid to just the occupied cells.",
-                () => { Config.Settings.SetFaustHeatScale((Config.Settings.FaustHeatScale + 1) % 2); SetFaustButtonText(scaleBtn, $"Scale: {FaustHeatScaleName()}"); RefreshFaustHeatmap(); }, 160);
+            // (The "Scale" cycler was removed — when a map underlay is active it's overridden and did nothing
+            // visible. The setting still defaults sensibly and can be changed under Faust → Settings → Heat map.)
+
+            // #7: map-underlay opacity for the heat map (shares Settings.FaustWorldMapOpacity with the World Map).
+            // Fade the map art down so the bright activity cells pop. Only visible effect when a map image is loaded.
+            var orow = MakeFaustRow(heatCard, "FaustHeatOpacityRow");
+            AddFaustInlineLabel(orow, "FaustHeatOpacityLbl", "Map image opacity:", 130);
+            var oGo = UIFactory.CreateSlider(orow, "FaustHeatOpacity", out var oSlider);
+            UIFactory.SetLayoutElement(oGo, minWidth: 150, preferredWidth: 220, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            oSlider.minValue = 0; oSlider.maxValue = 100; oSlider.wholeNumbers = true;
+            oSlider.value = Mathf.Clamp(Mathf.RoundToInt(Config.Settings.FaustWorldMapOpacity * 100f), 0, 100);
+            var oLbl = UIFactory.CreateLabel(orow, "FaustHeatOpacityVal", $"{Mathf.RoundToInt(Config.Settings.FaustWorldMapOpacity * 100f)}%",
+                TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
+            UIFactory.SetLayoutElement(oLbl.GameObject, minWidth: Theme.ScaledWidth(48), preferredWidth: Theme.ScaledWidth(52), flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+            var oLblTm = oLbl.TextMesh;
+            oSlider.onValueChanged.AddListener((UnityEngine.Events.UnityAction<float>)(v =>
+            {
+                int pct = Mathf.Clamp(Mathf.RoundToInt(v), 0, 100);
+                if (oLblTm != null) oLblTm.text = $"{pct}%";
+                Config.Settings.SetFaustWorldMapOpacity(pct / 100f);
+                RefreshFaustMapUnderlays();
+                RefreshFaustHeatmap();
+            }));
+
             _faustHeatStatus = AddBodyText(heatCard, "—", Theme.ScaledUI(11));
             _faustHeatGo = UIFactory.CreateVerticalGroup(heatCard, "FaustHeatGrid",
                 forceWidth: true, forceHeight: false, childControlWidth: true, childControlHeight: true,
@@ -3065,14 +3340,87 @@ public partial class MainPanel
         AddSectionHeading(list, "Online players");
         _faustPosListGo = MakeFaustListContainer(list, "FaustPosRows");
         RebuildFaustPositions();
+
+        // #5: the admin "Show players on map" controls moved to the bottom and collapsed (they're niche +
+        // experimental; the heat map / list are the everyday tools).
+        Raphael.UI.Forms.CollapsibleSection.Build(page, "Show players on map (admin · experimental)",
+            startExpanded: false, content => BuildFaustShowOnMapCard(content),
+            "Pin native M-key map icons on online players (server-side; needs [Faust.MapMarkers] Enabled).");
+    }
+
+    // Admin "Show players on map" controls — server-side native MapIcons via `.faust admin showpositions`. The
+    // SERVER attaches the real networked icons (the client can't fake them safely). Experimental; requires the
+    // server config [Faust.MapMarkers] Enabled=true, and the visibility model is still being finalized server-side.
+    private void BuildFaustShowOnMapCard(GameObject parent)
+    {
+        AddBodyText(parent,
+            "Tells <b>Faust (the server)</b> to pin native map icons on every online player, visible on the " +
+            "<b>M-key map</b>. <b>On</b> turns it on; open your map to see them. <color=#FFB070>Requires the " +
+            "server config <b>[Faust.MapMarkers] Enabled = true</b></color> — if Faust replies that it's disabled, " +
+            "an admin must enable it server-side and reload. Reply appears in chat. <i>Experimental: marker " +
+            "visibility (admin-only vs everyone) is still being finalized in Faust.</i>");
+        var mr = MakeFaustRow(parent, "FaustPosShowRow");
+        AddFaustButton(mr, "FaustPosShowOn", "Show on map: ON",
+            "Attach map icons to all online players (.faust admin showpositions on). Then open the M-key map.",
+            () => FaustClient.AdminShowPositions("on"), 150);
+        AddFaustButton(mr, "FaustPosShowOff", "OFF",
+            "Remove the map icons (.faust admin showpositions off).",
+            () => FaustClient.AdminShowPositions("off"), 80);
+        AddFaustButton(mr, "FaustPosShowStatus", "Status",
+            "Ask whether map markers are currently on + the server's MapMarkers config (.faust admin showpositions status).",
+            () => FaustClient.AdminShowPositions("status"), 90);
+        if (Config.Settings.FaustDiagnostics)
+        {
+            var mapRow = MakeFaustRow(parent, "FaustPosMapRow");
+            AddFaustButton(mapRow, "FaustPosMapProbe", "Probe map icons (diag)",
+                "Developer DIAGNOSTIC only — it does NOT show icons. It logs the game's map-icon component setup to LogOutput.log (read-only). Use “Show on map: ON” above to actually display markers.",
+                () => { try { Services.Faust.FaustMapProbe.Probe(); } catch { } }, 180);
+        }
     }
 
     private InputFieldRef _faustHeatInput;
     private TextMeshProUGUI _faustHeatStatus;
     private GameObject _faustHeatGo;
+    // Map view mode for the shared board: 0 = activity HEAT MAP (history), 1 = live PLAYER POSITIONS (snapshot).
+    private int _faustHeatViewIdx;
+    private ButtonRef _faustHeatViewBtn;
+    private bool _faustPosShowLabels = true;
+    private string FaustHeatViewLabel() => _faustHeatViewIdx == 1 ? "Players now (live)" : "Heat map";
+    // Heat-map time window (api 19): index into FaustHeatWindows; remembers the last target so the toggle re-queries it.
+    private static readonly (string label, int days)[] FaustHeatWindows = { ("All-time", 0), ("Today", 1), ("This week", 7), ("This month", 30) };
+    private int _faustHeatWindowIdx;
+    private ButtonRef _faustHeatWindowBtn;
+    private string _faustHeatLastTarget = "";
+    private int FaustHeatWindowDays() => FaustHeatWindows[Mathf.Clamp(_faustHeatWindowIdx, 0, FaustHeatWindows.Length - 1)].days;
+    private string FaustHeatWindowLabel() => FaustHeatWindows[Mathf.Clamp(_faustHeatWindowIdx, 0, FaustHeatWindows.Length - 1)].label;
+    private void QueryHeatWithWindow(string target)
+    {
+        // Asking for heat data implies the heat-map view — switch back to it so the result is visible.
+        if (_faustHeatViewIdx != 0) { _faustHeatViewIdx = 0; if (_faustHeatViewBtn != null) SetFaustButtonText(_faustHeatViewBtn, FaustHeatViewLabel()); }
+        _faustHeatLastTarget = target ?? ""; FaustProtocolService.QueryHeatmap(target, FaustHeatWindowDays());
+    }
+
+    // Live "players now" view: plot every online player on the calibrated map (dots + optional name labels).
+    private void RefreshFaustPlayersOnMap()
+    {
+        if (_faustHeatStatus != null)
+            _faustHeatStatus.text = StatusColored(FaustState.PositionsStatus,
+                $"{FaustState.PositionsTotalCount} online player(s) plotted.", FaustState.PositionsError,
+                "Click “Refresh positions” at the top to plot online players on the map.");
+        if (_faustHeatGo == null) return;
+        ClearChildren(_faustHeatGo);
+        if (FaustState.Positions.Count == 0)
+        {
+            AddFaustListLine(_faustHeatGo, "PmEmpty",
+                $"<color={Theme.MutedBodyHex}>No positions loaded — click “Refresh positions” at the top of this tab.</color>", Theme.ScaledUI(11));
+            return;
+        }
+        BuildFaustPositionsMap(_faustHeatGo, FaustState.Positions);
+    }
 
     private void RefreshFaustHeatmap()
     {
+        if (_faustHeatViewIdx == 1) { RefreshFaustPlayersOnMap(); return; }
         if (_faustHeatStatus != null)
         {
             var h = FaustState.HeatmapHeader;
@@ -3135,9 +3483,61 @@ public partial class MainPanel
             }
         }
 
-        // Board extent: when "Map" scale is selected AND Faust sent mapbounds (api 17, §11b), draw to the FULL
-        // buildable-map cell box so sparse data reads as a few dots on the real map outline; else size to the
-        // occupied cells (zoom to data). Coarsen divides the map box by k to match the merged cell indices.
+        // Board extent: when a map backdrop is active (grid and/or drop-in worldmap.png — Settings.FaustWorldMap*),
+        // draw to the FIXED calibrated world rectangle so the heat cells line up with the map art. Else when "Map"
+        // scale is selected AND Faust sent mapbounds (api 17, §11b), draw to the buildable-map cell box; else size
+        // to the occupied cells (zoom to data). Coarsen divides the map box by k to match the merged cell indices.
+        int maxCount = 1; foreach (var c in rcells) if (c.Count > maxCount) maxCount = c.Count;
+        bool mapMode = FaustMapBackdrop.Active;
+
+        if (mapMode)
+        {
+            float wMinX = Config.Settings.FaustWorldMapMinX, wMaxX = Config.Settings.FaustWorldMapMaxX;
+            float wMinZ = Config.Settings.FaustWorldMapMinZ, wMaxZ = Config.Settings.FaustWorldMapMaxZ;
+            if (wMaxX <= wMinX) wMaxX = wMinX + 1f;
+            if (wMaxZ <= wMinZ) wMaxZ = wMinZ + 1f;
+            float spanX = wMaxX - wMinX, spanZ = wMaxZ - wMinZ;
+            int boardT = Theme.ScaledWidth(380);
+            float scale = boardT / Mathf.Max(spanX, spanZ);
+            int boardW = Mathf.Clamp(Mathf.CeilToInt(spanX * scale), 40, Theme.ScaledWidth(520));
+            int boardH = Mathf.Clamp(Mathf.CeilToInt(spanZ * scale), 40, Theme.ScaledWidth(520));
+
+            var board = UIFactory.CreateUIObject("FaustHeatBoard", parent);
+            var bg = board.AddComponent<UnityEngine.UI.Image>();
+            bg.color = new Color(0f, 0f, 0f, 0.45f); bg.raycastTarget = false;
+            bool fitSquare = FaustMapBackdrop.HasImage;
+            if (fitSquare)
+            {
+                // Square board filling the panel width (sized next frame); fixed size → parent reserves height.
+                int sq = boardT;
+                UIFactory.SetLayoutElement(board, minWidth: sq, preferredWidth: sq, flexibleWidth: 0, minHeight: sq, preferredHeight: sq, flexibleHeight: 0);
+                FillMapBoardToWidth(board, parent);
+            }
+            else
+                UIFactory.SetLayoutElement(board, minWidth: boardW, preferredWidth: boardW, flexibleWidth: 0, minHeight: boardH, preferredHeight: boardH, flexibleHeight: 0);
+            FaustMapBackdrop.Decorate(board, boardW, boardH, wMinX, wMaxX, wMinZ, wMaxZ);
+
+            foreach (var c in rcells)
+            {
+                float wx = c.Cx * effCell, wz = c.Cz * effCell;   // cell's world bottom-left corner
+                float nx0 = (wx - wMinX) / spanX, nz0 = (wz - wMinZ) / spanZ;            // cell corner (normalized)
+                float nx1 = (wx + effCell - wMinX) / spanX, nz1 = (wz + effCell - wMinZ) / spanZ;
+                if (nx1 < 0f || nx0 > 1f || nz1 < 0f || nz0 > 1f) continue;              // fully outside the map rect
+                float t = Mathf.Clamp01(Mathf.Sqrt(c.Count / (float)maxCount));
+                var cell = UIFactory.CreateUIObject("hc", board);
+                var img = cell.AddComponent<UnityEngine.UI.Image>();
+                img.color = FaustHeatColor(t); img.raycastTarget = false;
+                var rt = cell.GetComponent<RectTransform>();
+                // Normalized cell rectangle: spans its world cell across the board at any pixel size.
+                rt.anchorMin = new Vector2(Mathf.Clamp01(nx0), Mathf.Clamp01(nz0));
+                rt.anchorMax = new Vector2(Mathf.Clamp01(nx1), Mathf.Clamp01(nz1));
+                rt.pivot = new Vector2(0.5f, 0.5f); rt.sizeDelta = Vector2.zero; rt.anchoredPosition = Vector2.zero;
+                TooltipHover.Attach(cell, $"~({wx:0}, {wz:0}) world · {c.Count} sample(s)");
+            }
+            FinishFaustHeatmap(parent, rcells.Count, hdr, effCell, k, true, true);
+            return;
+        }
+
         bool useMap = Config.Settings.FaustHeatScale == 0 && hdr.HasMapBounds;
         int bMinCx, bMinCz, bMaxCx, bMaxCz;
         if (useMap)
@@ -3154,18 +3554,17 @@ public partial class MainPanel
         // Bigger board target (was 260) so the grid reads more like a map; cell cap raised so a small grid
         // doesn't look like a few giant blocks. Min 1px so a full-map box stays inside the panel. Scales with UI text.
         int cellPx = Mathf.Clamp(Theme.ScaledWidth(380) / Mathf.Max(gw, gh), 1, Theme.ScaledWidth(22));
-        int boardW = gw * cellPx, boardH = gh * cellPx;
-        int maxCount = 1; foreach (var c in rcells) if (c.Count > maxCount) maxCount = c.Count;
+        int legacyBoardW = gw * cellPx, legacyBoardH = gh * cellPx;
 
-        var board = UIFactory.CreateUIObject("FaustHeatBoard", parent);
-        var bg = board.AddComponent<UnityEngine.UI.Image>();
-        bg.color = new Color(0f, 0f, 0f, 0.45f); bg.raycastTarget = false;
-        UIFactory.SetLayoutElement(board, minWidth: boardW, preferredWidth: boardW, flexibleWidth: 0, minHeight: boardH, preferredHeight: boardH, flexibleHeight: 0);
+        var lboard = UIFactory.CreateUIObject("FaustHeatBoard", parent);
+        var lbg = lboard.AddComponent<UnityEngine.UI.Image>();
+        lbg.color = new Color(0f, 0f, 0f, 0.45f); lbg.raycastTarget = false;
+        UIFactory.SetLayoutElement(lboard, minWidth: legacyBoardW, preferredWidth: legacyBoardW, flexibleWidth: 0, minHeight: legacyBoardH, preferredHeight: legacyBoardH, flexibleHeight: 0);
 
         foreach (var c in rcells)
         {
             float t = Mathf.Clamp01(Mathf.Sqrt(c.Count / (float)maxCount));   // sqrt so low-traffic cells still show
-            var cell = UIFactory.CreateUIObject("hc", board);
+            var cell = UIFactory.CreateUIObject("hc", lboard);
             var img = cell.AddComponent<UnityEngine.UI.Image>();
             img.color = FaustHeatColor(t); img.raycastTarget = false;
             var rt = cell.GetComponent<RectTransform>();
@@ -3174,7 +3573,12 @@ public partial class MainPanel
             rt.anchoredPosition = new Vector2((c.Cx - bMinCx) * cellPx, (c.Cz - bMinCz) * cellPx);
             TooltipHover.Attach(cell, $"~({c.Cx * effCell:0}, {c.Cz * effCell:0}) world · {c.Count} sample(s)");
         }
+        FinishFaustHeatmap(parent, rcells.Count, hdr, effCell, k, useMap, false);
+    }
 
+    // Shared heat-map legend (gradient ramp) + caption, used by both the map-backdrop and legacy render paths.
+    private void FinishFaustHeatmap(GameObject parent, int cellCount, FaustHeatHeader hdr, float effCell, int k, bool useMap, bool mapMode)
+    {
         // Gradient legend: a "less → more" colour ramp so the colours have a key.
         var legend = UIFactory.CreateHorizontalGroup(parent, "HmLegend",
             forceExpandWidth: false, forceExpandHeight: false, childControlWidth: true, childControlHeight: true,
@@ -3197,14 +3601,20 @@ public partial class MainPanel
         string detailNote = k == 1
             ? $"{effCell:0}-unit cells (Faust's finest)"
             : $"{effCell:0}-unit cells (grouped {k}× from {hdr.Cell:0}-unit native)";
-        string scaleNote = useMap ? "full-map scale"
-            : (hdr.HasMapBounds ? "zoomed to data" : "zoomed to data (server has no map bounds)");
+        string scaleNote = mapMode
+            ? (FaustMapBackdrop.HasImage ? "map image + grid" : "coordinate grid")
+            : (useMap ? "full-map scale" : (hdr.HasMapBounds ? "zoomed to data" : "zoomed to data (server has no map bounds)"));
         AddFaustListLine(parent, "HmCap",
-            $"<color={Theme.MutedBodyHex}>{rcells.Count} cell(s) · {hdr.Samples} sample(s) · {detailNote} · {scaleNote} · {FaustHeatGradientName()} ramp · +X→right, +Z→up (north)</color>", Theme.ScaledUI(10));
+            $"<color={Theme.MutedBodyHex}>{cellCount} cell(s) · {hdr.Samples} sample(s) · {detailNote} · {scaleNote} · {FaustHeatGradientName()} ramp · +X→right, +Z→up (north)</color>", Theme.ScaledUI(10));
     }
 
     private void RebuildFaustPositions()
     {
+        // Once a roster has loaded, allow player-pickers to auto-kick another `positions` later if it empties.
+        if (FaustState.PositionsStatus == FaustQueryStatus.Ready && FaustState.Positions.Count > 0)
+            _faustPickerKickedPositions = false;
+        // Keep the live "Players now" map in sync when it's the active view.
+        if (_faustHeatViewIdx == 1 && _faustHeatGo != null) RefreshFaustHeatmap();
         if (_faustPosStatus != null)
             _faustPosStatus.text = StatusColored(FaustState.PositionsStatus,
                 $"{FaustState.PositionsTotalCount} player(s) online.", FaustState.PositionsError,
@@ -3261,7 +3671,10 @@ public partial class MainPanel
         AddFaustButton(row, "FaustResNearest", "Nearest",
             "Scan the castle nearest you (.faust api resources nearest).",
             () => FaustProtocolService.QueryResources("nearest"), 100);
-        _faustResInput = AddFaustLabeledInput(controls, "FaustResIdx", "Territory index", "e.g. 42");
+        // #4: pick a territory from a dropdown (index · region · coords) instead of memorising index numbers.
+        AddFaustCastlePicker(controls, "FaustResPick", idx =>
+        { if (_faustResInput != null) _faustResInput.Text = idx; FaustProtocolService.QueryResources(idx); });
+        _faustResInput = AddFaustLabeledInput(controls, "FaustResIdx", "…or type index", "e.g. 42");
         var row2 = MakeFaustRow(controls, "FaustResLookupRow");
         AddFaustButton(row2, "FaustResLookup", "Scan index",
             "Scan a specific territory by index (.faust api resources <index>).",
@@ -3338,9 +3751,9 @@ public partial class MainPanel
 
     // The features Faust's admin commands act on (control includes the "all" wildcard; access does not).
     private static readonly string[] FaustCtrlFeatures =
-        { "all", "castleinfo", "plotavailability", "playerinfo", "playerpositions", "castleresources", "stats", "[redacted]" };
+        { "all", "castleinfo", "plotavailability", "playerinfo", "playerpositions", "castleresources", "stats" };
     private static readonly string[] FaustAccessFeatures =
-        { "castleinfo", "plotavailability", "playerinfo", "playerpositions", "castleresources", "stats", "[redacted]" };
+        { "castleinfo", "plotavailability", "playerinfo", "playerpositions", "castleresources", "stats" };
 
     private int _faustCtrlFeatureIdx;
     private ButtonRef _faustCtrlFeatureBtn;
@@ -3352,7 +3765,7 @@ public partial class MainPanel
     private InputFieldRef _faustAccPlayer;
 
     // data management (Faust 0.11): which store the wipe targets.
-    private static readonly string[] FaustDataStores = { "activity", "unlocks", "usage", "all" };
+    private static readonly string[] FaustDataStores = { "activity", "unlocks", "usage", "heatmap", "kills", "all" };
     private int _faustDataStoreIdx;
     private ButtonRef _faustDataStoreBtn;
     private InputFieldRef _faustDataClearDays;
@@ -3420,6 +3833,12 @@ public partial class MainPanel
             "Show the effective control state for every feature (.faust admin status).",
             () => FaustClient.AdminStatus(""), 130);
 
+        // ---- Live config editor (§3b / §15b, Faust 0.16+) ----
+        BuildFaustConfigEditor(page);
+
+        // ---- World-scan admin (whitelist + prefab lookup; moved here from the World Map tab) ----
+        BuildFaustWorldScanAdminCards(page);
+
         // ---- Data management (Faust 0.11+) ----
         var dataCard = AddCard(page, "FaustAdminDataCard");
         AddSectionHeading(dataCard, "Data management");
@@ -3451,6 +3870,8 @@ public partial class MainPanel
             "<color=#FF6B6B>•</color> <b>unlocks</b> = Faust's record of which Faust <i>features</i> a player has earned " +
             "(NOT their in-game V-Blood / level progression — that's the game's, and is untouched).\n" +
             "<color=#FF6B6B>•</color> <b>usage</b> = Faust's cost / cooldown locks.\n" +
+            "<color=#FF6B6B>•</color> <b>heatmap</b> = the player-position density samples.\n" +
+            "<color=#FF6B6B>•</color> <b>kills</b> = the kill + boss-defeat tallies behind the leaderboards.\n" +
             "<color=#FF6B6B>•</color> <b>all</b> = every Faust store above.");
         AddBodyText(wipeCard,
             "<color=#FF6B6B>Destructive and irreversible (within Faust's data).</color> Always <b>Preview</b> first " +
@@ -3468,6 +3889,252 @@ public partial class MainPanel
             () => FaustClient.AdminDataWipe(DataStore(), confirm: true), 150);
     }
 
+    // ---- §3b / §15b live config editor data ----
+    // Per-feature settable keys (the §3b table). The feature cycler excludes "all" — `set` targets one feature.
+    private static readonly string[] FaustCfgFeatures =
+        { "castleinfo", "plotavailability", "playerinfo", "playerpositions", "castleresources", "stats",
+          "allcastles", "decaywatch", "clans", "heatmap", "bosses", "kills" };
+    private static readonly (string key, string hint)[] FaustCfgGlobals =
+    {
+        ("enabled",              "on | off (Faust master switch)"),
+        ("audit",                "on | off"),
+        ("verbose",              "on | off"),
+        ("ratelimit",            "seconds ≥ 0 (per-player anti-spam)"),
+        ("ratelimitexempt",      "on | off (admins exempt)"),
+        ("resetsteamids",        "comma-separated SteamIDs"),
+        ("sessiontracking",      "on | off"),
+        ("concurrencysampling",  "on | off"),
+        ("maxconcurrencypoints", "integer"),
+        ("sessionretentiondays", "days (0 = keep forever)"),
+        ("datanamespace",        "text (per-world separation)"),
+        ("heatmapenabled",       "on | off"),
+        ("heatmapsample",        "30–300 (seconds)"),
+        ("heatmapcellsize",      "world units"),
+        ("heatmapmaxcells",      "integer"),
+        ("heatmapretentiondays", "days kept for the heat-map time windows (Faust 0.16.4; default 30)"),
+        ("mapmarkersenabled",    "on | off"),
+        ("mapmarkerprefab",      "PrefabGUID"),
+        ("bossmaplimit",         "100–20000 world units (boss live/down threshold; default 9000 covers the map — raise only if a live boss reads “Not spawned”)"),
+        ("worldscanmaxresults",  "World Map result cap (Faust 0.16.1; default 10000, 0 = unlimited). Raise if a scan is cut short; Raphael caps its own paging for safety."),
+    };
+    private int _faustCfgFeatureIdx;
+    private ButtonRef _faustCfgFeatureBtn;
+    private int _faustCfgGlobalIdx;
+    private ButtonRef _faustCfgGlobalBtn;
+    private TextMeshProUGUI _faustCfgGlobalHint;
+    private InputFieldRef _faustCfgGlobalValue;
+    private string CfgFeature()     => FaustCfgFeatures[Mathf.Clamp(_faustCfgFeatureIdx, 0, FaustCfgFeatures.Length - 1)];
+    private string CfgGlobal()      => FaustCfgGlobals[Mathf.Clamp(_faustCfgGlobalIdx, 0, FaustCfgGlobals.Length - 1)].key;
+    private string CfgGlobalHint()  => FaustCfgGlobals[Mathf.Clamp(_faustCfgGlobalIdx, 0, FaustCfgGlobals.Length - 1)].hint;
+
+    // Quick-set inline gate fields (the "straight-line" form).
+    private InputFieldRef _cfgCostGuid, _cfgCostQty, _cfgCd, _cfgMaxUses, _cfgPeriod, _cfgWindow, _cfgNearGuid, _cfgNearDist, _cfgUnlockGuid;
+
+    // Client-side validation so a bad entry gives a clear in-UI hint instead of a server "Rejected: not a
+    // whole number" reply. A blank field is allowed (means "leave unchanged").
+    private static bool BlankOrInt(string s)   => string.IsNullOrEmpty(s) || int.TryParse(s, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out _);
+    private static bool BlankOrFloat(string s) => string.IsNullOrEmpty(s) || float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _);
+    // A muted descriptive line placed under a quick-set row to explain the expected values.
+    // A muted hint line that WRAPS (AddFaustListLine disables wrapping → long hints ran off the container).
+    private void AddCfgHint(GameObject card, string id, string text)
+    {
+        var lbl = UIFactory.CreateLabel(card, id, $"<color={Theme.MutedBodyHex}>{text}</color>",
+            TextAlignmentOptions.TopLeft, color: null, fontSize: Theme.ScaledUI(11));
+        UIFactory.SetLayoutElement(lbl.GameObject, minWidth: 320, preferredWidth: 380, flexibleWidth: 1,
+            minHeight: Theme.ScaledHeight(18), flexibleHeight: 0);
+        lbl.TextMesh.enableWordWrapping = true;
+        lbl.TextMesh.overflowMode = TextOverflowModes.Overflow;
+    }
+
+    // Every per-feature setting as a dedicated straight-line row (label + control(s) + Set) — covers the whole
+    // §3b table, so there's no separate generic "Any setting" cycler. Each row targets the feature selected in
+    // the cycler above and sends `.faust admin set <feature> <setting> <value>` (reply appears in chat).
+    private void BuildFaustQuickGates(GameObject card)
+    {
+        AddSectionHeading(card, "Adjust settings");
+        AddBodyText(card,
+            $"<color={Theme.MutedBodyHex}>These apply to the feature selected above — click <b>Get current " +
+            "values</b> first to see what they are now. For the typed rows, leave a field blank to leave that " +
+            "part unchanged.</color>");
+
+        // Access — one-click buttons.
+        var accRow = MakeFaustRow(card, "FaustCfgQAccessRow");
+        AddFaustInlineLabel(accRow, "QAccessLbl", "Access:", 72);
+        AddFaustButton(accRow, "QAccessOff",    "Off",     "Disable this feature for everyone (set access Off).",   () => FaustClient.AdminSet(CfgFeature(), "access", "Off"), 64);
+        AddFaustButton(accRow, "QAccessAdmin",  "Admins",  "Admin-only access (set access AdminOnly).",             () => FaustClient.AdminSet(CfgFeature(), "access", "AdminOnly"), 84);
+        AddFaustButton(accRow, "QAccessPlayers","Players", "Open to all players (set access Players).",             () => FaustClient.AdminSet(CfgFeature(), "access", "Players"), 84);
+
+        // PvP availability — one-click buttons.
+        var pvpRow = MakeFaustRow(card, "FaustCfgQPvpRow");
+        AddFaustInlineLabel(pvpRow, "QPvpLbl", "PvP:", 72);
+        AddFaustButton(pvpRow, "QPvpAlways", "Always",   "Available in any game mode (set availability Always).", () => FaustClient.AdminSet(CfgFeature(), "availability", "Always"), 76);
+        AddFaustButton(pvpRow, "QPvpPvE",    "PvE only", "Only on PvE servers (set availability PvEOnly).",        () => FaustClient.AdminSet(CfgFeature(), "availability", "PvEOnly"), 84);
+        AddFaustButton(pvpRow, "QPvpPvP",    "PvP only", "Only on PvP servers (set availability PvPOnly).",        () => FaustClient.AdminSet(CfgFeature(), "availability", "PvPOnly"), 84);
+
+        // Delivery + admins-exempt — one-click buttons on one row.
+        var delRow = MakeFaustRow(card, "FaustCfgQDelRow");
+        AddFaustInlineLabel(delRow, "QDelLbl", "Delivery:", 72);
+        AddFaustButton(delRow, "QDelServer", "Server",  "Server-mediated delivery (set delivery ServerMediated).", () => FaustClient.AdminSet(CfgFeature(), "delivery", "ServerMediated"), 80);
+        AddFaustButton(delRow, "QDelFree",   "Free",    "Free / client-side delivery (set delivery Free).",        () => FaustClient.AdminSet(CfgFeature(), "delivery", "Free"), 70);
+        AddFaustInlineLabel(delRow, "QExLbl", "Admins exempt:", 110);
+        AddFaustButton(delRow, "QExOn",  "On",  "Admins bypass this feature's cost/cooldown (set adminsexempt on).",  () => FaustClient.AdminSet(CfgFeature(), "adminsexempt", "on"), 56);
+        AddFaustButton(delRow, "QExOff", "Off", "Admins are NOT exempt from this feature's gates (set adminsexempt off).", () => FaustClient.AdminSet(CfgFeature(), "adminsexempt", "off"), 56);
+
+        // Cost — item GUID + qty.
+        var costRow = MakeFaustRow(card, "FaustCfgQCostRow");
+        AddFaustInlineLabel(costRow, "QCostLbl", "Cost:", 72);
+        _cfgCostGuid = AddFaustInlineInput(costRow, "QCostGuid", "item GUID (0=free)", 130);
+        _cfgCostQty  = AddFaustInlineInput(costRow, "QCostQty", "qty", 54);
+        AddFaustButton(costRow, "QCostSet", "Set cost",
+            "Set the item cost (set costitem <guid> + costqty <n> in one command). Blank GUID/qty leaves that part unchanged; GUID 0 = free.",
+            () => {
+                var g = _cfgCostGuid?.Text?.Trim(); var q = _cfgCostQty?.Text?.Trim();
+                if (!BlankOrInt(g) || !BlankOrInt(q))
+                { FaustState.SetGateNotice("Cost needs whole numbers — Item is the prefab GUID hash (e.g. 576389135 or a negative hash), Qty is a count. Not an item name."); return; }
+                var parts = new System.Collections.Generic.List<string>();
+                if (!string.IsNullOrEmpty(g)) parts.Add($"costitem={g}");
+                if (!string.IsNullOrEmpty(q)) parts.Add($"costqty={q}");
+                FaustClient.AdminSetPairs(CfgFeature(), string.Join(",", parts));
+            }, 100);
+        AddCfgHint(card, "QCostHint",
+            "Item = the item’s PrefabGUID (a whole-number hash, e.g. 576389135 — not the item name); Qty = how many to charge per use. Set Item to 0 for free.");
+
+        // Cooldown — seconds.
+        var cdRow = MakeFaustRow(card, "FaustCfgQCdRow");
+        AddFaustInlineLabel(cdRow, "QCdLbl", "Cooldown:", 72);
+        _cfgCd = AddFaustInlineInput(cdRow, "QCd", "seconds (0=none)", 130);
+        AddFaustButton(cdRow, "QCdSet", "Set cooldown",
+            "Set the flat per-use cooldown in seconds (set cooldown <s>; 0 = none).",
+            () => {
+                var s = _cfgCd?.Text?.Trim();
+                if (!BlankOrInt(s)) { FaustState.SetGateNotice("Cooldown must be a whole number of seconds."); return; }
+                if (!string.IsNullOrEmpty(s)) FaustClient.AdminSet(CfgFeature(), "cooldown", s);
+            }, 120);
+        AddCfgHint(card, "QCdHint", "Seconds a player must wait between uses of this feature. 0 = no cooldown.");
+
+        // Usage limit — maxuses / period / window.
+        var limRow = MakeFaustRow(card, "FaustCfgQLimitRow");
+        AddFaustInlineLabel(limRow, "QLimLbl", "Limit:", 72);
+        _cfgMaxUses = AddFaustInlineInput(limRow, "QMaxUses", "max uses", 80);
+        _cfgPeriod  = AddFaustInlineInput(limRow, "QPeriod", "period s", 80);
+        _cfgWindow  = AddFaustInlineInput(limRow, "QWindow", "window s", 80);
+        AddFaustButton(limRow, "QLimitSet", "Set limit",
+            "Set the usage rate limit in one command: maxuses uses per period seconds, each opening a window-second grace (set maxuses/period/window; 0 = unlimited). Blank fields are left unchanged.",
+            () => {
+                var m = _cfgMaxUses?.Text?.Trim(); var p = _cfgPeriod?.Text?.Trim(); var w = _cfgWindow?.Text?.Trim();
+                if (!BlankOrInt(m) || !BlankOrInt(p) || !BlankOrInt(w))
+                { FaustState.SetGateNotice("Limit fields must be whole numbers (max uses, and period / window in seconds)."); return; }
+                var parts = new System.Collections.Generic.List<string>();
+                if (!string.IsNullOrEmpty(m)) parts.Add($"maxuses={m}");
+                if (!string.IsNullOrEmpty(p)) parts.Add($"period={p}");
+                if (!string.IsNullOrEmpty(w)) parts.Add($"window={w}");
+                FaustClient.AdminSetPairs(CfgFeature(), string.Join(",", parts));
+            }, 100);
+        AddCfgHint(card, "QLimitHint",
+            "Max uses = how many times a player may use this per period. Period s = the period length in seconds (3600 = hour, 86400 = day). Window s = optional grace window in seconds. Use 0 for unlimited.");
+
+        // Proximity — prefab GUID + metres.
+        var nearRow = MakeFaustRow(card, "FaustCfgQNearRow");
+        AddFaustInlineLabel(nearRow, "QNearLbl", "Proximity:", 72);
+        _cfgNearGuid = AddFaustInlineInput(nearRow, "QNearGuid", "object GUID (0=off)", 130);
+        _cfgNearDist = AddFaustInlineInput(nearRow, "QNearDist", "metres", 64);
+        AddFaustButton(nearRow, "QNearSet", "Set proximity",
+            "Require players to be near an object to use this feature, in one command (set nearprefab <guid> + neardist <m>; GUID 0 = no proximity gate). Blank fields unchanged.",
+            () => {
+                var g = _cfgNearGuid?.Text?.Trim(); var d = _cfgNearDist?.Text?.Trim();
+                if (!BlankOrInt(g) || !BlankOrFloat(d))
+                { FaustState.SetGateNotice("Proximity needs an object PrefabGUID (whole number) and a distance in metres (a number)."); return; }
+                var parts = new System.Collections.Generic.List<string>();
+                if (!string.IsNullOrEmpty(g)) parts.Add($"nearprefab={g}");
+                if (!string.IsNullOrEmpty(d)) parts.Add($"neardist={d}");
+                FaustClient.AdminSetPairs(CfgFeature(), string.Join(",", parts));
+            }, 120);
+        AddCfgHint(card, "QNearHint",
+            "Object = the PrefabGUID of an object the player must stand near (a whole-number hash); Metres = how close, in metres. Set Object to 0 for no proximity requirement.");
+
+        // Unlock criterion — preset buttons + a BossKill:<guid> input.
+        var unlRow = MakeFaustRow(card, "FaustCfgQUnlockRow");
+        AddFaustInlineLabel(unlRow, "QUnlockLbl", "Unlock:", 72);
+        AddFaustButton(unlRow, "QUnlockNone",  "None",       "No unlock criterion — available per its access (set unlock None).",   () => FaustClient.AdminSet(CfgFeature(), "unlock", "None"), 64);
+        AddFaustButton(unlRow, "QUnlockFinal", "Final boss", "Unlocks after a player defeats Dracula (set unlock FinalBoss).",       () => FaustClient.AdminSet(CfgFeature(), "unlock", "FinalBoss"), 88);
+        AddFaustButton(unlRow, "QUnlockAllB",  "All bosses", "Unlocks after defeating every V Blood (set unlock AllBosses).",        () => FaustClient.AdminSet(CfgFeature(), "unlock", "AllBosses"), 90);
+        AddFaustButton(unlRow, "QUnlockAllQ",  "All quests", "Unlocks after completing all quests (set unlock AllQuests).",          () => FaustClient.AdminSet(CfgFeature(), "unlock", "AllQuests"), 90);
+        var unl2 = MakeFaustRow(card, "FaustCfgQUnlock2Row");
+        AddFaustInlineLabel(unl2, "QUnlockBkLbl", "…or after V Blood GUID:", 160);
+        _cfgUnlockGuid = AddFaustInlineInput(unl2, "QUnlockGuid", "V Blood PrefabGUID", 130);
+        AddFaustButton(unl2, "QUnlockBkSet", "Set",
+            "Unlock this feature only after a player defeats the V Blood with this PrefabGUID (set unlock BossKill:<guid>).",
+            () => { var g = _cfgUnlockGuid?.Text?.Trim(); if (!string.IsNullOrEmpty(g)) FaustClient.AdminSet(CfgFeature(), "unlock", $"BossKill:{g}"); }, 70);
+    }
+
+    // §3b / §15b: a live editor for Faust's config (cost / cooldown / usage-limit / proximity / access /
+    // availability / unlock per feature, plus global settings) — sends `.faust admin set/get/resetcfg …`
+    // and the reply appears in chat. Mirrors the existing block/schedule/grant controls.
+    private void BuildFaustConfigEditor(GameObject page)
+    {
+        var card = AddCard(page, "FaustConfigEditorCard");
+        AddSectionHeading(card, "Live config editor");
+        AddBodyText(card,
+            "Change a feature's <b>cost</b>, <b>cooldown</b>, <b>usage limit</b> (uses / period / window), " +
+            "<b>proximity</b> requirement, <b>access</b>, <b>PvP availability</b>, or <b>unlock</b> criterion " +
+            "<b>at runtime</b> — no .cfg edit or restart. The change takes effect immediately and is persisted. " +
+            $"Runs as an admin chat command ({Mono(".faust admin set …")}); <b>Faust's confirmation appears in chat</b>.");
+        if (FaustState.Present && !FaustState.SupportsApi18)
+            AddBodyText(card,
+                $"<color=#FFB070>The live config editor needs <b>Faust 0.16+</b> (API ≥ 18). This server runs API {FaustState.ApiVersion} — the commands below will be ignored until the Faust plugin is updated on the <b>server</b>.</color>");
+        // Feature selector.
+        var fr = MakeFaustRow(card, "FaustCfgFeatureRow");
+        AddFaustInlineLabel(fr, "FaustCfgFeatureLbl", "Feature:", 72);
+        _faustCfgFeatureBtn = AddFaustButton(fr, "FaustCfgFeatureCycle", $"←{CfgFeature()} →",
+            "Cycle which feature the settings below target.",
+            () => { _faustCfgFeatureIdx = (_faustCfgFeatureIdx + 1) % FaustCfgFeatures.Length; SetFaustButtonText(_faustCfgFeatureBtn, $"←{CfgFeature()} →"); }, 190);
+
+        // Read current values FIRST (right under the selector), then reset if needed.
+        var getRow = MakeFaustRow(card, "FaustCfgGetRow");
+        AddFaustButton(getRow, "FaustCfgGetAll", "Get current values",
+            "List the selected feature's current settings so you can see them before changing anything (.faust admin get <feature>). Reply appears in chat.",
+            () => FaustClient.AdminGet(CfgFeature()), 180);
+        AddFaustButton(getRow, "FaustCfgResetFeature", "Reset feature to defaults",
+            "Restore EVERY setting on the selected feature to its default (.faust admin resetcfg <feature>).",
+            () => FaustClient.AdminResetCfg(CfgFeature()), 200);
+
+        // ── Every per-feature setting as a straight-line row (covers the whole §3b table) ──────────
+        BuildFaustQuickGates(card);
+
+        // Global settings.
+        var gCard = AddCard(page, "FaustConfigGlobalCard");
+        AddSectionHeading(gCard, "Global settings");
+        AddBodyText(gCard,
+            $"<color={Theme.MutedBodyHex}>Server-wide Faust settings (master switch, anti-spam, data collection, " +
+            "heat-map, map markers) — not per-feature.</color>");
+        var gr = MakeFaustRow(gCard, "FaustCfgGlobalRow");
+        _faustCfgGlobalBtn = AddFaustButton(gr, "FaustCfgGlobalCycle", $"←{CfgGlobal()} →",
+            "Cycle which global setting to change.",
+            () => { _faustCfgGlobalIdx = (_faustCfgGlobalIdx + 1) % FaustCfgGlobals.Length; SetFaustButtonText(_faustCfgGlobalBtn, $"←{CfgGlobal()} →"); RefreshCfgGlobalHint(); }, 220);
+        _faustCfgGlobalHint = AddBodyText(gCard, "", Theme.ScaledUI(11));
+        RefreshCfgGlobalHint();
+        _faustCfgGlobalValue = AddFaustLabeledInput(gCard, "FaustCfgGlobalValue", "New value", "value (see hint above)");
+        var gSetRow = MakeFaustRow(gCard, "FaustCfgGlobalSetRow");
+        AddFaustButton(gSetRow, "FaustCfgGlobalSet", "Set",
+            "Apply the typed value to the selected global setting (.faust admin setglobal <setting> <value>).",
+            () => { var v = _faustCfgGlobalValue?.Text?.Trim(); if (!string.IsNullOrEmpty(v)) FaustClient.AdminSetGlobal(CfgGlobal(), v); }, 90);
+        AddFaustButton(gSetRow, "FaustCfgGlobalGet", "Get",
+            "Read the current value of the selected global setting (.faust admin getglobal <setting>).",
+            () => FaustClient.AdminGetGlobal(CfgGlobal()), 90);
+        AddFaustButton(gSetRow, "FaustCfgGlobalGetAll", "Get all",
+            "List every global setting (.faust admin getglobal).",
+            () => FaustClient.AdminGetGlobal(), 90);
+        AddFaustButton(gSetRow, "FaustCfgGlobalReset", "Reset",
+            "Restore the selected global setting to its default (.faust admin resetcfg global <setting>).",
+            () => FaustClient.AdminResetCfg("global", CfgGlobal()), 90);
+    }
+
+    private void RefreshCfgGlobalHint()
+    {
+        if (_faustCfgGlobalHint != null)
+            _faustCfgGlobalHint.text = $"<color={Theme.MutedBodyHex}>Accepted: {CfgGlobalHint()}</color>";
+    }
+
     private void BuildFaustAdminAccessTab(GameObject page)
     {
         EnsureFaustSubscribed();
@@ -3482,7 +4149,10 @@ public partial class MainPanel
 
         var who = AddCard(page, "FaustAccessWhoCard");
         AddSectionHeading(who, "Player");
-        _faustAccPlayer = AddFaustLabeledInput(who, "FaustAccPlayer", "Name or SteamID", "exact player name…");
+        // #3 (admin): pick an online player from a dropdown (or type any name / SteamID below).
+        AddFaustPlayerPicker(who, "FaustAccPick", "Online player", (steam, name) =>
+        { if (_faustAccPlayer != null) _faustAccPlayer.Text = string.IsNullOrEmpty(steam) ? name : steam; });
+        _faustAccPlayer = AddFaustLabeledInput(who, "FaustAccPlayer", "…or name / SteamID", "exact player name…");
 
         var featCard = AddCard(page, "FaustAccessFeatureCard");
         AddSectionHeading(featCard, "Feature");
@@ -3582,8 +4252,8 @@ public partial class MainPanel
         var heatGradRow = MakeFaustRow(heatCfgCard, "FaustSettHeatGradRow");
         ButtonRef settGradBtn = null;
         settGradBtn = AddFaustButton(heatGradRow, "FaustSettHeatGrad", $"Colors: {FaustHeatGradientName()}",
-            "Cycle the heat-map color ramp: Theme → Heat (red→yellow) → Green → Mono (black & white).",
-            () => { Config.Settings.SetFaustHeatGradient((Config.Settings.FaustHeatGradient + 1) % 4); SetFaustButtonText(settGradBtn, $"Colors: {FaustHeatGradientName()}"); RefreshFaustHeatmap(); }, 200);
+            "Cycle the heat-map color ramp: Theme → Heat → Green → Mono → Magma → Ice→Fire → Viridis (the last three are tuned for the world-map image).",
+            () => { Config.Settings.SetFaustHeatGradient((Config.Settings.FaustHeatGradient + 1) % 7); SetFaustButtonText(settGradBtn, $"Colors: {FaustHeatGradientName()}"); RefreshFaustHeatmap(); }, 200);
         ButtonRef settDetBtn = null;
         settDetBtn = AddFaustButton(heatGradRow, "FaustSettHeatDetail", $"Detail: {FaustHeatDetailName()}",
             "Cycle render detail: Native (Faust's finest cell) → Grouped 2× → Grouped 4×.",
@@ -3718,15 +4388,22 @@ public partial class MainPanel
             ClearChildren(_faustAccessListGo);
             if (FaustState.AccessStatus == FaustQueryStatus.Ready && FaustState.Access.Count > 0)
             {
-                var cols = new[]
+                // §15a (api 18): show the configured non-cost gates (cooldown / usage-limit / proximity) in a
+                // "Gates" column — but only when Faust actually emits them, else every row would read "—".
+                bool showGates = FaustState.SupportsApi18;
+                var colList = new System.Collections.Generic.List<FaustCol>
                 {
-                    new FaustCol(Theme.ScaledWidth(120), 1, TextAlignmentOptions.MidlineLeft),  // Feature
-                    new FaustCol(Theme.ScaledWidth(70), 0, TextAlignmentOptions.MidlineLeft),   // Scope
-                    new FaustCol(Theme.ScaledWidth(110), 0, TextAlignmentOptions.MidlineLeft),  // Cost
-                    new FaustCol(Theme.ScaledWidth(60), 0, TextAlignmentOptions.MidlineRight),  // Granted
-                    new FaustCol(Theme.ScaledWidth(70), 0, TextAlignmentOptions.MidlineRight),  // Unlocked
+                    new FaustCol(Theme.ScaledWidth(110), 0, TextAlignmentOptions.MidlineLeft),  // Feature
+                    new FaustCol(Theme.ScaledWidth(64), 0, TextAlignmentOptions.MidlineLeft),   // Scope
+                    new FaustCol(Theme.ScaledWidth(96), 0, TextAlignmentOptions.MidlineLeft),   // Cost
                 };
-                AddFaustHeaderRow(_faustAccessListGo, "AccHdr", cols, new[] { "Feature", "Scope", "Cost", "Granted", "Unlocked" });
+                var hdr = new System.Collections.Generic.List<string> { "Feature", "Scope", "Cost" };
+                if (showGates) { colList.Add(new FaustCol(Theme.ScaledWidth(160), 1, TextAlignmentOptions.MidlineLeft)); hdr.Add("Gates"); }
+                colList.Add(new FaustCol(Theme.ScaledWidth(56), showGates ? 0 : 1, TextAlignmentOptions.MidlineRight));  // Granted
+                colList.Add(new FaustCol(Theme.ScaledWidth(64), 0, TextAlignmentOptions.MidlineRight));  // Unlocked
+                hdr.Add("Granted"); hdr.Add("Unlocked");
+                var cols = colList.ToArray();
+                AddFaustHeaderRow(_faustAccessListGo, "AccHdr", cols, hdr.ToArray());
                 int i = 0;
                 foreach (var a in FaustState.Access)
                 {
@@ -3734,8 +4411,10 @@ public partial class MainPanel
                     string cost = a.CostGuid != 0 && a.CostQty > 0 ? FaustNames.Cost(a.CostGuid, a.CostQty) : "free";
                     string unlocked = a.Unlocked < 0 ? "<color=#888888>N/A</color>" : a.Unlocked.ToString();
                     string granted = a.Granted < 0 ? "—" : a.Granted.ToString();
-                    AddFaustCellRow(_faustAccessListGo, $"Acc{i++}", cols,
-                        new[] { a.Feature, $"<color={scopeCol}>{a.Scope}</color>", cost, granted, unlocked });
+                    var vals = new System.Collections.Generic.List<string> { a.Feature, $"<color={scopeCol}>{a.Scope}</color>", cost };
+                    if (showGates) vals.Add(FaustGatesSummary(a));
+                    vals.Add(granted); vals.Add(unlocked);
+                    AddFaustCellRow(_faustAccessListGo, $"Acc{i++}", cols, vals.ToArray());
                 }
             }
         }
@@ -3768,6 +4447,1267 @@ public partial class MainPanel
             else if (FaustState.UsageStatus == FaustQueryStatus.Empty)
                 AddFaustListLine(_faustUsageListGo, "UseEmpty", $"<color={Theme.MutedBodyHex}>No feature usage recorded in this window.</color>", Theme.ScaledUI(11));
         }
+    }
+
+    // §15a: a compact one-cell summary of a feature's non-cost gates (cooldown / usage-limit / proximity).
+    private static string FaustGatesSummary(FaustAccessRow a)
+    {
+        var bits = new System.Collections.Generic.List<string>();
+        if (a.HasCooldown) bits.Add($"cd {FmtDuration(a.Cd)}");
+        if (a.MaxUses > 0)
+            bits.Add(a.Period > 0 ? $"{a.MaxUses}/{FmtDuration(a.Period)}" : $"max {a.MaxUses}");
+        if (a.Window > 0) bits.Add($"win {FmtDuration(a.Window)}");
+        if (a.HasProximity) bits.Add($"near {FaustNames.Item(a.NearPrefab)} {a.NearDist:0.#}m");
+        return bits.Count == 0 ? "<color=#888888>—</color>" : string.Join("  ·  ", bits);
+    }
+
+    // ============================ V BLOOD BOSS BOARD (§B1, api 18) ============================
+
+    private TextMeshProUGUI _faustBossesStatus;
+    private GameObject _faustBossesListGo;
+    private InputFieldRef _faustBossInput;
+    private InputFieldRef _faustBossLimitInput;   // §18 fix: setglobal bossmaplimit tuning
+    private TextMeshProUGUI _faustBossLookupStatus;
+    private GameObject _faustBossLookupGo;
+
+    // Board filter: which bosses to list. Default is "All" — show everything Faust returns (the roster often
+    // includes many pooled/staged `down` entities; the filter lets you narrow to live / live+defeated).
+    private static readonly string[] FaustBossFilters = { "All", "Live + defeated", "Live only" };
+    private int _faustBossFilterIdx;   // 0 = All (default)
+    private ButtonRef _faustBossFilterBtn;
+    private string FaustBossFilterLabel() => FaustBossFilters[Mathf.Clamp(_faustBossFilterIdx, 0, FaustBossFilters.Length - 1)];
+    private bool BossPassesFilter(FaustBoss b) => _faustBossFilterIdx switch
+    {
+        1 => b.IsUp || b.Defeated,   // Live + defeated
+        2 => b.IsUp,                 // Live only
+        _ => true,                   // All (default — show everything)
+    };
+
+    private void BuildFaustBossesTab(GameObject page)
+    {
+        EnsureFaustSubscribed();
+        page = BeginAdminGate(page);   // bosses is AdminOnly-default (locations are intel); server still enforces
+
+        AddFaustGateNotice(page);
+        var intro = AddCard(page, "FaustBossesIntro");
+        AddSectionHeading(intro, "V Blood boss status");
+        AddBodyText(intro,
+            "A server-wide <b>V Blood status board</b> — which bosses are <b>live in the world right now</b> " +
+            "(with position, region, HP and level) and which have been <b>defeated</b>. Faust sees the whole " +
+            $"map, so it reports bosses the spatially-culled client can't. Served by {Mono(".faust api bosses")} " +
+            "(Faust 0.16+).");
+        AddBodyText(intro, FaustFeatureHint("bosses"));
+        AddBodyText(intro,
+            $"<color={Theme.MutedBodyHex}><b>Live</b> = Faust sees a placed world entity (with location / HP). " +
+            "<b>Not spawned</b> = Faust reports no placed entity for that V Blood right now (pooled / awaiting " +
+            "spawn). The board lists every V Blood Faust returns — Raphael pages through the whole list.</color>");
+        AddBodyText(intro,
+            $"<color={Theme.MutedBodyHex}><b>“Not spawned”</b> = Faust can't locate that V Blood on the map right now " +
+            "(defeated, or genuinely pooled / awaiting respawn). <b>Roaming</b> bosses (which patrol rather than sit in a " +
+            "fixed lair) used to read down because their position came from a stale source; <b>Faust 0.16.3</b> now combines " +
+            "the boss's status with the game's own map-token tracking to recover the live location. So on a 0.16.3 server the " +
+            "previously-missing roamers should report <b>Live</b> with coords. If bosses still read “Not spawned”, confirm the " +
+            "server is on <b>0.16.3</b> (the handshake), then use <b>Diagnose detection</b>. The <b>boss map limit</b> below is " +
+            "a separate distance cutoff (default 9000 covers the map). Server-side classification; Raphael loads the entire " +
+            "board (never a paging issue) and shows whatever Faust sends.</color>");
+        if (FaustState.Present && !FaustState.SupportsBosses)
+            AddBodyText(intro,
+                $"<color=#FFB070>This server's Faust is older than 0.16 (API {FaustState.ApiVersion}) and doesn't have the boss board yet — “Refresh” will time out.</color>");
+
+        var controls = AddCard(page, "FaustBossesControls");
+        var row = MakeFaustRow(controls, "FaustBossesBtns");
+        AddFaustButton(row, "FaustBossesRefresh", "Refresh boss board",
+            "Pull every V Blood's live/defeated status (.faust api bosses).",
+            () => FaustProtocolService.QueryBosses(), 180);
+        _faustBossFilterBtn = AddFaustButton(row, "FaustBossesFilter", $"Show: {FaustBossFilterLabel()}",
+            "Filter the board. 'All' (default) shows every row; 'Live + defeated' hides never-defeated pooled/staged " +
+            "bosses; 'Live only' shows just bosses Faust sees in the world now.",
+            () => { _faustBossFilterIdx = (_faustBossFilterIdx + 1) % FaustBossFilters.Length; SetFaustButtonText(_faustBossFilterBtn, $"Show: {FaustBossFilterLabel()}"); RebuildFaustBosses(); }, 190);
+        _faustBossesStatus = AddBodyText(controls, "—", Theme.ScaledUI(11));
+        // Admin diagnostic (§18): dump a boss's pooled/placed entity state server-side so the detection can be tuned.
+        var diagRow = MakeFaustRow(controls, "FaustBossesDiagRow");
+        AddFaustButton(diagRow, "FaustBossesDiag", "Diagnose detection (admin)",
+            "Ask Faust to dump each V Blood entity's pooled/placed state + position (.faust admin bossdiag). Use the " +
+            "lookup box below to target one boss, or run it blank for all. Output goes to the server log / chat — it " +
+            "helps the Faust side fix bosses that read “Not spawned” while alive.",
+            () => FaustClient.AdminBossDiag(_faustBossInput?.Text?.Trim()), 220);
+
+        // §18 fix (Faust 0.16.1): the placed-vs-pooled threshold is live-tunable via setglobal bossmaplimit.
+        // Default raised to 9000 (covers the whole map; the off-map sentinel is ~10000); config range up to 20000.
+        var limRow = MakeFaustRow(controls, "FaustBossesLimitRow");
+        AddFaustInlineLabel(limRow, "FaustBossLimLbl", "Boss map limit:", 110);
+        _faustBossLimitInput = AddFaustInlineInput(limRow, "FaustBossLimit", "9000", 80);
+        AddFaustButton(limRow, "FaustBossLimitSet", "Set limit (admin)",
+            "Raise/lower Faust's live-vs-down threshold in world units (.faust admin setglobal bossmaplimit=N). Default " +
+            "9000 covers the whole map. If a live boss still reads “Not spawned”, raise it (max 20000); going past ~10000 " +
+            "also includes any off-map sentinel entity, so keep it just high enough. Refresh after setting.",
+            () => {
+                var s = _faustBossLimitInput?.Text?.Trim();
+                if (!int.TryParse(s, out var n) || n < 100 || n > 20000)
+                { FaustState.SetGateNotice("Boss map limit must be a whole number 100–20000 (default 9000)."); return; }
+                FaustClient.AdminSetGlobal("bossmaplimit", n.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }, 150);
+
+        // Single-boss lookup.
+        var lookCard = AddCard(page, "FaustBossLookupCard");
+        AddSectionHeading(lookCard, "Look up one boss");
+        // #2: pick a boss from a dropdown instead of typing. Sourced from the live board (FaustState.Bosses) merged
+        // with the known V Blood list so it's usable before the (admin-gated) board loads. Selecting one runs the
+        // lookup (by GUID when the boss is on the board, else by name). The text box below remains for unlisted GUIDs.
+        var bnames = new System.Collections.Generic.List<string>();
+        var bguids = new System.Collections.Generic.List<int>();
+        var bpick = AddFaustLabeledDropdown(lookCard, "FaustBossPick", "Pick a boss", FaustBossPickerOptions(bnames, bguids), idx =>
+        {
+            if (idx <= 0 || idx >= bnames.Count) return;
+            if (_faustBossInput != null) _faustBossInput.Text = bnames[idx];
+            FaustProtocolService.QueryBoss(bguids[idx] != 0
+                ? bguids[idx].ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : bnames[idx]);
+        }, 240);
+        Action brepop = null;
+        brepop = () =>
+        {
+            if (bpick == null) { FaustState.BossesChanged -= brepop; return; }
+            try { if (bpick.gameObject == null) { FaustState.BossesChanged -= brepop; return; } }
+            catch { FaustState.BossesChanged -= brepop; return; }
+            SetFaustDropdownOptions(bpick, FaustBossPickerOptions(bnames, bguids), 0);
+        };
+        FaustState.BossesChanged += brepop;
+        _faustBossInput = AddFaustLabeledInput(lookCard, "FaustBossQ", "…or type name / GUID", "e.g. Solarus the Immaculate");
+        var lrow = MakeFaustRow(lookCard, "FaustBossLookupBtns");
+        AddFaustButton(lrow, "FaustBossLookup", "Look up boss",
+            "Look up a single V Blood by name (greedy — multi-word names work) or PrefabGUID (.faust api boss <name|guid>).",
+            () => { var s = _faustBossInput?.Text?.Trim(); if (!string.IsNullOrEmpty(s)) FaustProtocolService.QueryBoss(s); }, 140);
+        _faustBossLookupStatus = AddBodyText(lookCard, "—", Theme.ScaledUI(11));
+        _faustBossLookupGo = MakeFaustListContainer(lookCard, "FaustBossLookupRows");
+
+        BuildFaustBossTrackerCard(page);
+
+        var list = AddCard(page, "FaustBossesListCard");
+        _faustBossesListGo = MakeFaustListContainer(list, "FaustBossesRows");
+        RebuildFaustBosses();
+        RefreshFaustBossLookup();
+    }
+
+    private GameObject _faustBossTrackerListGo;   // #5: retired (tracking now lives on the board); stays null → the
+                                                  // legacy RebuildFaustBossTrackerSlots() no-ops. Kept to avoid churn.
+
+    // Boss-tracker overlay controls (#5). Tracking is managed entirely from the board's <b>+ Track / ★ Tracked</b>
+    // toggles below (one source of truth — no redundant secondary list). This card is just the overlay's
+    // show/hide + auto-refresh switches.
+    private void BuildFaustBossTrackerCard(GameObject page)
+    {
+        var card = AddCard(page, "FaustBossTrackerCard");
+        AddSectionHeading(card, "Boss tracker overlay");
+        AddBodyText(card,
+            $"Pin up to <b>{Config.Settings.FaustBossTrackerMaxSlots}</b> V Bloods to a small movable overlay that " +
+            "shows their live / defeated status, HP and location at a glance. <b>Track or untrack from the board " +
+            "below</b> — each row has a <b>+ Track / ★ Tracked</b> button. This card just shows or hides that overlay.");
+
+        var btnRow = MakeFaustRow(card, "FaustBossTrackBtnRow");
+        AddFaustButton(btnRow, "FaustBossTrackShow", "Show / hide overlay",
+            "Toggle the boss-tracker overlay on screen (also available from the main panel footer).",
+            () => { Plugin.UIManager?.ToggleOverlay(PanelType.FaustBossTrackerOverlay); RefreshAllOverlayToggleStates(); }, 170);
+
+        AddFaustBoolToggle(card, "FaustBossTrackAuto", "Auto-refresh the tracked bosses every ~5 seconds",
+            Config.Settings.FaustBossTrackerAutoRefresh,
+            v => Config.Settings.SetFaustBossTrackerAutoRefresh(v),
+            "When on, the overlay re-queries ONLY the bosses you're tracking (one quick per-boss lookup each, not the whole board) about every 5 seconds while it's open. Off by default; the board is admin-default, so this is most useful for admins/trusted players.");
+    }
+
+    private void RebuildFaustBossTrackerSlots()
+    {
+        if (_faustBossTrackerListGo == null) return;
+        ClearChildren(_faustBossTrackerListGo);
+        var slots = Config.Settings.GetFaustBossTrackerSlots();
+        if (slots.Count == 0)
+        {
+            AddFaustListLine(_faustBossTrackerListGo, "TrkEmpty", $"<color={Theme.MutedBodyHex}>No bosses tracked yet.</color>", Theme.ScaledUI(11));
+            return;
+        }
+        foreach (var name in slots)
+        {
+            var row = MakeFaustRow(_faustBossTrackerListGo, $"Trk_{name}");
+            var lbl = UIFactory.CreateLabel(row, "TrkName", name, TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
+            UIFactory.SetLayoutElement(lbl.GameObject, minWidth: 200, preferredWidth: 260, flexibleWidth: 1,
+                minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
+            lbl.TextMesh.enableWordWrapping = false; lbl.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
+            string captured = name;
+            AddFaustButton(row, "TrkRemove", "Remove",
+                $"Stop tracking {name}.",
+                () => {
+                    Config.Settings.RemoveFaustBossTrackerSlot(captured);
+                    FaustBossTrackerOverlayPanel.RaiseSlotsChanged();
+                    RebuildFaustBossTrackerSlots();
+                    RebuildFaustBosses();
+                }, 100);
+        }
+    }
+
+    private FaustCol[] BossColumns(bool showLoc)
+    {
+        var cols = new System.Collections.Generic.List<FaustCol>
+        {
+            new FaustCol(Theme.ScaledWidth(92),  0, TextAlignmentOptions.MidlineLeft),   // Status
+            new FaustCol(Theme.ScaledWidth(150), 1, TextAlignmentOptions.MidlineLeft),   // Boss
+            new FaustCol(Theme.ScaledWidth(44),  0, TextAlignmentOptions.MidlineRight),  // Level
+            new FaustCol(Theme.ScaledWidth(72),  0, TextAlignmentOptions.MidlineRight),  // HP
+            new FaustCol(Theme.ScaledWidth(84),  0, TextAlignmentOptions.MidlineLeft),   // Region
+            new FaustCol(Theme.ScaledWidth(58),  0, TextAlignmentOptions.MidlineLeft),   // Defeated
+        };
+        if (showLoc) cols.Add(new FaustCol(Theme.ScaledWidth(88), 0, TextAlignmentOptions.MidlineRight)); // Loc
+        return cols.ToArray();
+    }
+
+    private string[] BossCells(FaustBoss b, bool showLoc)
+    {
+        // A "down" boss is a known V Blood that isn't in the world right now (pooled/staged, or defeated and
+        // awaiting respawn). Label it clearly so the empty stat columns read as "not spawned", not "missing".
+        string status = b.IsUp ? "<color=#90EE90>● Live</color>" : "<color=#888888>Not spawned</color>";
+        string lvl = b.IsUp && b.Level >= 0 ? b.Level.ToString() : "<color=#888888>—</color>";
+        string hp = !b.IsUp ? "<color=#888888>—</color>" : FaustHpColored(b.HpPct);
+        string region = b.IsUp ? FaustRegionCell(b.Region) : "<color=#888888>—</color>";
+        string defeated = b.Defeated ? "<color=#90EE90>✓</color>" : "<color=#888888>–</color>";
+        var vals = new System.Collections.Generic.List<string>
+            { status, FaustBossName(b), lvl, hp, region, defeated };
+        if (showLoc) vals.Add(b.OnMap ? FaustLocCell(b.X, b.Z) : "<color=#888888>—</color>");
+        return vals.ToArray();
+    }
+
+    private void RebuildFaustBosses()
+    {
+        var all = FaustState.Bosses;
+        var shown = new System.Collections.Generic.List<FaustBoss>();
+        foreach (var b in all) if (BossPassesFilter(b)) shown.Add(b);
+
+        if (_faustBossesStatus != null)
+            _faustBossesStatus.text = StatusColored(FaustState.BossesStatus,
+                $"{shown.Count} shown / {all.Count} V Blood(s) ({FaustBossFilterLabel().ToLowerInvariant()}).",
+                FaustState.BossesError,
+                "Click “Refresh boss board” to see which V Bloods are live or defeated.");
+        if (_faustBossesListGo == null) return;
+        ClearChildren(_faustBossesListGo);
+        if (FaustState.BossesStatus != FaustQueryStatus.Ready) return;
+
+        if (shown.Count == 0)
+        {
+            AddFaustListLine(_faustBossesListGo, "BossNone",
+                all.Count > 0
+                    ? $"<color={Theme.MutedBodyHex}>All {all.Count} boss(es) are hidden by the “{FaustBossFilterLabel()}” filter — switch it to “All”.</color>"
+                    : $"<color={Theme.MutedBodyHex}>No bosses reported.</color>", Theme.ScaledUI(11));
+            return;
+        }
+
+        bool showLoc = false;
+        foreach (var b in shown) if (b.OnMap) { showLoc = true; break; }
+        AddBossHeaderRow(_faustBossesListGo, showLoc);
+        int i = 0;
+        foreach (var b in shown) AddBossDataRow(_faustBossesListGo, $"Boss{i++}", b, showLoc);
+    }
+
+    private void RefreshFaustBossLookup()
+    {
+        if (_faustBossLookupStatus != null)
+            _faustBossLookupStatus.text = StatusColored(FaustState.BossLookupStatus,
+                "", FaustState.BossLookupError, "Type a boss name or GUID and click “Look up boss”.");
+        if (_faustBossLookupGo == null) return;
+        ClearChildren(_faustBossLookupGo);
+        if (FaustState.BossLookupStatus != FaustQueryStatus.Ready || FaustState.BossLookup == null) return;
+        var b = FaustState.BossLookup;
+        bool showLoc = b.OnMap;
+        AddBossHeaderRow(_faustBossLookupGo, showLoc);
+        AddBossDataRow(_faustBossLookupGo, "BossLk0", b, showLoc);
+        if (b.IsUp && b.Hp >= 0 && b.HpMax > 0)
+            AddFaustListLine(_faustBossLookupGo, "BossLkHp",
+                $"<color={Theme.MutedBodyHex}>HP {b.Hp:0}/{b.HpMax:0}</color>", Theme.ScaledUI(11));
+    }
+
+    // ---- boss rows with a leading per-row Track toggle (so the user never has to type a name) ----
+    private int BossTrackColWidth => Theme.ScaledWidth(96);
+
+    private void AddBossHeaderRow(GameObject parent, bool showLoc)
+    {
+        var row = MakeFaustRow(parent, "BossHdr");
+        AddBossHdrCell(row, "Track", BossTrackColWidth, 0, TextAlignmentOptions.MidlineLeft);
+        var cols = BossColumns(showLoc);
+        var titles = showLoc
+            ? new[] { "Status", "Boss", "Lvl", "HP", "Region", "Killed", "Loc (X,Z)" }
+            : new[] { "Status", "Boss", "Lvl", "HP", "Region", "Killed" };
+        for (int i = 0; i < cols.Length; i++)
+            AddBossHdrCell(row, titles[i], cols[i].Width, cols[i].Flex, cols[i].Align);
+    }
+
+    private void AddBossHdrCell(GameObject row, string title, int width, int flex, TextAlignmentOptions align)
+    {
+        var l = UIFactory.CreateLabel(row, $"BH_{title}", title, align, color: null, fontSize: Theme.ScaledUI(12));
+        UIFactory.SetLayoutElement(l.GameObject, minWidth: width, preferredWidth: width, flexibleWidth: flex,
+            minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
+        l.TextMesh.fontStyle = FontStyles.Bold;
+        l.TextMesh.color = new Color(0.90f, 0.72f, 0.36f);
+        l.TextMesh.enableWordWrapping = false;
+        l.TextMesh.overflowMode = TextOverflowModes.Overflow;
+    }
+
+    private void AddBossDataRow(GameObject parent, string id, FaustBoss b, bool showLoc)
+    {
+        var row = MakeFaustRow(parent, id);
+        string fname = FaustBossName(b);
+        bool tracked = Config.Settings.GetFaustBossTrackerSlots()
+            .Exists(x => string.Equals(x, fname, System.StringComparison.OrdinalIgnoreCase));
+        AddFaustButton(row, "BTrack", tracked ? "★ Tracked" : "+ Track",
+            tracked ? $"Tracking {fname} on the boss-tracker overlay — click to stop."
+                    : $"Add {fname} to the boss-tracker overlay (up to {Config.Settings.FaustBossTrackerMaxSlots}).",
+            () => ToggleBossTrack(fname), 96);
+
+        var cols = BossColumns(showLoc);
+        var cells = BossCells(b, showLoc);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            var l = UIFactory.CreateLabel(row, $"BC{i}", cells[i], cols[i].Align, color: null, fontSize: Theme.ScaledUI(12));
+            UIFactory.SetLayoutElement(l.GameObject, minWidth: cols[i].Width, preferredWidth: cols[i].Width, flexibleWidth: cols[i].Flex,
+                minHeight: Theme.ScaledHeight(22), preferredHeight: Theme.ScaledHeight(24), flexibleHeight: 0);
+            l.TextMesh.enableWordWrapping = false;
+            l.TextMesh.overflowMode = TextOverflowModes.Ellipsis;
+        }
+    }
+
+    // Toggle a boss's membership in the tracker overlay (max enforced); refresh the board + tracker card + overlay.
+    private void ToggleBossTrack(string fname)
+    {
+        if (string.IsNullOrEmpty(fname) || fname == "—") return;
+        bool tracked = Config.Settings.GetFaustBossTrackerSlots()
+            .Exists(x => string.Equals(x, fname, System.StringComparison.OrdinalIgnoreCase));
+        if (tracked)
+            Config.Settings.RemoveFaustBossTrackerSlot(fname);
+        else if (!Config.Settings.AddFaustBossTrackerSlot(fname))
+            FaustState.SetGateNotice($"Boss tracker is full ({Config.Settings.FaustBossTrackerMaxSlots}) — untrack one first.");
+        FaustBossTrackerOverlayPanel.RaiseSlotsChanged();
+        RebuildFaustBosses();
+        RebuildFaustBossTrackerSlots();
+    }
+
+    // Color an HP percentage green→amber→red.
+    private static string FaustHpColored(int pct)
+    {
+        if (pct < 0) return "<color=#888888>—</color>";
+        string c = pct >= 66 ? "#90EE90" : (pct >= 33 ? "#FFD75A" : "#FF6B6B");
+        return $"<color={c}>{pct}%</color>";
+    }
+
+    // Player-friendly V Blood name from guid + dev-name (FaustBossNames ports Bloodcraft's map; falls back
+    // to a prettified dev-name for anything not listed).
+    private static string FaustBossName(FaustBoss b)
+        => FaustBossNames.Resolve(b?.Guid ?? 0, b?.Name ?? "");
+
+    private static string FaustBossKillName(string wireName, int guid)
+        => FaustBossNames.Resolve(guid, wireName ?? "");
+
+    // ============================ KILL LEADERBOARDS (§B2, api 18) ============================
+
+    // Days window shared by both boards: 0 = Today (1d), 1 = This week (7d), 2 = All-time (0d).
+    private static readonly (string label, int days)[] FaustKillWindows =
+        { ("Today", 1), ("This week", 7), ("All-time", 0) };
+    private int _faustKillWindowIdx = 2;   // default All-time
+    private ButtonRef _faustKillWindowBtn;
+    private int FaustKillDays() => FaustKillWindows[Mathf.Clamp(_faustKillWindowIdx, 0, FaustKillWindows.Length - 1)].days;
+    private string FaustKillWindowLabel() => FaustKillWindows[Mathf.Clamp(_faustKillWindowIdx, 0, FaustKillWindows.Length - 1)].label;
+
+    private TextMeshProUGUI _faustKillsStatus;
+    private GameObject _faustKillsListGo;
+    private TextMeshProUGUI _faustBossKillsStatus;
+    private GameObject _faustBossKillsListGo;
+
+    private void BuildFaustKillsTab(GameObject page)
+    {
+        EnsureFaustSubscribed();
+        page = BeginAdminGate(page);   // kills is AdminOnly-default; server still enforces
+
+        AddFaustGateNotice(page);
+        var intro = AddCard(page, "FaustKillsIntro");
+        AddSectionHeading(intro, "Kill & boss-defeat leaderboards");
+        AddBodyText(intro,
+            "Server <b>leaderboards</b> from Faust's kill tracking — the <b>top killers</b> (with how many of " +
+            "their kills were PvP) and the most-defeated <b>V Bloods</b>. Pick a window (today / this week / " +
+            $"all-time). Served by {Mono(".faust api kills")} / {Mono(".faust api bosskills")} (Faust 0.16+; " +
+            "requires the server's kill-tracking collection to be on).");
+        AddBodyText(intro, FaustFeatureHint("kills"));
+        if (FaustState.Present && !FaustState.SupportsKills)
+            AddBodyText(intro,
+                $"<color=#FFB070>This server's Faust is older than 0.16 (API {FaustState.ApiVersion}) and doesn't have the leaderboards yet — “Refresh” will time out.</color>");
+
+        // Shared window cycler.
+        var winCard = AddCard(page, "FaustKillsWindowCard");
+        var wrow = MakeFaustRow(winCard, "FaustKillsWindowRow");
+        _faustKillWindowBtn = AddFaustButton(wrow, "FaustKillsWindowCycle", $"←{FaustKillWindowLabel()} →",
+            "Cycle the leaderboard window the Refresh buttons below use (today / this week / all-time).",
+            () => { _faustKillWindowIdx = (_faustKillWindowIdx + 1) % FaustKillWindows.Length; SetFaustButtonText(_faustKillWindowBtn, $"←{FaustKillWindowLabel()} →"); }, 160);
+
+        // Top killers.
+        var killCard = AddCard(page, "FaustKillsCard");
+        AddSectionHeading(killCard, "Top killers");
+        var krow = MakeFaustRow(killCard, "FaustKillsBtns");
+        AddFaustButton(krow, "FaustKillsRefresh", "Refresh killers",
+            "Pull the top-killer leaderboard for the selected window (.faust api kills <days>).",
+            () => FaustProtocolService.QueryKills(FaustKillDays()), 160);
+        _faustKillsStatus = AddBodyText(killCard, "—", Theme.ScaledUI(11));
+        _faustKillsListGo = MakeFaustListContainer(killCard, "FaustKillsRows");
+
+        // Boss defeats.
+        var bkCard = AddCard(page, "FaustBossKillsCard");
+        AddSectionHeading(bkCard, "Most-defeated V Bloods");
+        var bkrow = MakeFaustRow(bkCard, "FaustBossKillsBtns");
+        AddFaustButton(bkrow, "FaustBossKillsRefresh", "Refresh boss defeats",
+            "Pull the V Blood defeat-count leaderboard for the selected window (.faust api bosskills <days>).",
+            () => FaustProtocolService.QueryBossKills(FaustKillDays()), 180);
+        _faustBossKillsStatus = AddBodyText(bkCard, "—", Theme.ScaledUI(11));
+        _faustBossKillsListGo = MakeFaustListContainer(bkCard, "FaustBossKillsRows");
+
+        RebuildFaustKills();
+    }
+
+    private void RebuildFaustKills()
+    {
+        // Top killers
+        if (_faustKillsStatus != null)
+            _faustKillsStatus.text = StatusColored(FaustState.KillsStatus,
+                $"{FaustState.KillsTotalCount} player(s) — {FaustKillDaysLabel(FaustState.KillsDays)}.",
+                FaustState.KillsError, "Pick a window and click “Refresh killers”.");
+        if (_faustKillsListGo != null)
+        {
+            ClearChildren(_faustKillsListGo);
+            if (FaustState.KillsStatus == FaustQueryStatus.Ready && FaustState.Kills.Count > 0)
+            {
+                var cols = new[]
+                {
+                    new FaustCol(Theme.ScaledWidth(36),  0, TextAlignmentOptions.MidlineRight),  // Rank
+                    new FaustCol(Theme.ScaledWidth(150), 1, TextAlignmentOptions.MidlineLeft),   // Player
+                    new FaustCol(Theme.ScaledWidth(64),  0, TextAlignmentOptions.MidlineRight),  // Kills
+                    new FaustCol(Theme.ScaledWidth(64),  0, TextAlignmentOptions.MidlineRight),  // PvP
+                };
+                AddFaustHeaderRow(_faustKillsListGo, "KillHdr", cols, new[] { "#", "Player", "Kills", "PvP" });
+                foreach (var k in FaustState.Kills)
+                {
+                    string name = string.IsNullOrEmpty(k.Name) ? "—" : k.Name;
+                    AddFaustCellRow(_faustKillsListGo, $"Kill{k.Rank}", cols,
+                        new[] { k.Rank.ToString(), name, k.Kills.ToString(), k.Pvp.ToString() });
+                }
+            }
+            else if (FaustState.KillsStatus == FaustQueryStatus.Empty)
+                AddFaustListLine(_faustKillsListGo, "KillEmpty", $"<color={Theme.MutedBodyHex}>No kills recorded in this window.</color>", Theme.ScaledUI(11));
+        }
+
+        // Boss defeats
+        if (_faustBossKillsStatus != null)
+            _faustBossKillsStatus.text = StatusColored(FaustState.BossKillsStatus,
+                $"{FaustState.BossKillsTotalCount} V Blood(s) — {FaustKillDaysLabel(FaustState.BossKillsDays)}.",
+                FaustState.BossKillsError, "Pick a window and click “Refresh boss defeats”.");
+        if (_faustBossKillsListGo != null)
+        {
+            ClearChildren(_faustBossKillsListGo);
+            if (FaustState.BossKillsStatus == FaustQueryStatus.Ready && FaustState.BossKills.Count > 0)
+            {
+                var cols = new[]
+                {
+                    new FaustCol(Theme.ScaledWidth(36),  0, TextAlignmentOptions.MidlineRight),  // Rank
+                    new FaustCol(Theme.ScaledWidth(180), 1, TextAlignmentOptions.MidlineLeft),   // V Blood
+                    new FaustCol(Theme.ScaledWidth(70),  0, TextAlignmentOptions.MidlineRight),  // Defeats
+                };
+                AddFaustHeaderRow(_faustBossKillsListGo, "BkHdr", cols, new[] { "#", "V Blood", "Defeats" });
+                foreach (var bk in FaustState.BossKills)
+                    AddFaustCellRow(_faustBossKillsListGo, $"Bk{bk.Rank}", cols,
+                        new[] { bk.Rank.ToString(), FaustBossKillName(bk.Name, bk.Guid), bk.Count.ToString() });
+            }
+            else if (FaustState.BossKillsStatus == FaustQueryStatus.Empty)
+                AddFaustListLine(_faustBossKillsListGo, "BkEmpty", $"<color={Theme.MutedBodyHex}>No boss defeats recorded in this window.</color>", Theme.ScaledUI(11));
+        }
+    }
+
+    private static string FaustKillDaysLabel(int days) => days <= 0 ? "all-time" : (days == 1 ? "today" : $"last {days}d");
+
+    // ============================ WORLD-ASSET MAP (§C1, api 18) ============================
+
+    private static readonly string[] FaustWsTypes = { "All", "Units", "Nodes" };
+    private int _faustWsTypeIdx;
+    private TMP_Dropdown _faustWsTypeDd;
+    private InputFieldRef _faustWsId;
+    private InputFieldRef _faustWsBloodType;
+    private InputFieldRef _faustWsUnitType;   // §C1: EntityCategory.UnitCategory int filter (implies units)
+    private int _faustWsBloodQMin;
+    private TextMeshProUGUI _faustWsBloodQLabel;
+    private TextMeshProUGUI _faustWsStatus;
+    private GameObject _faustWsMapGo;
+    private GameObject _faustWsListGo;
+    private InputFieldRef _faustWsAdminGuid;
+    private InputFieldRef _faustWsPrefabQuery;   // §7 prefab lookup helper (admin chat)
+    private InputFieldRef _faustWsMapMinX, _faustWsMapMaxX, _faustWsMapMinZ, _faustWsMapMaxZ;   // #3 underlay calibration
+    private TextMeshProUGUI _faustWsMapOpacityLabel;
+    private TextMeshProUGUI _faustWsMapImgStatus;
+    private InputFieldRef _faustWsMapCapFilter;   // runtime map-texture capture name filter
+    private int _faustWsMapNudgeStep = 50;        // world-unit step for the overlay-calibration nudge buttons
+    private ButtonRef _faustWsMapStepBtn;
+    // Category → Type filter (dropdowns; from the curated catalog + scan results). Drives both the client-side
+    // narrowing AND the server-side scan spec (§C1). _faustWsSuppressDd guards repopulation from re-firing onChanged.
+    private int _faustWsCatIdx, _faustWsSubIdx;
+    private TMP_Dropdown _faustWsCatDd, _faustWsSubDd;
+    private bool _faustWsSuppressDd;
+    private readonly System.Collections.Generic.List<string> _faustWsCats = new();
+    private readonly System.Collections.Generic.List<string> _faustWsSubs = new();
+
+    private string FaustWsTypeLabel() => FaustWsTypes[Mathf.Clamp(_faustWsTypeIdx, 0, FaustWsTypes.Length - 1)];
+
+    // Size a map board to fill its container's width as a square (the map image is square), deferred to the next
+    // frame so the container has been laid out. A fixed pixel size means the parent vertical group reserves the
+    // right height (no overlap). The image, dots, heat cells, and grid all use normalized anchors, so they reflow
+    // automatically when the board is resized.
+    private void FillMapBoardToWidth(GameObject board, GameObject container)
+    {
+        if (board == null || container == null) return;
+        int cap = Theme.ScaledWidth(680);
+        int tries = 0;
+        System.Action act = null;
+        act = () =>
+        {
+            tries++;
+            if (board == null) { Behaviors.CoreUpdateBehavior.Actions.Remove(act); return; }
+            var crt = container.GetComponent<RectTransform>();
+            float w = crt != null ? crt.rect.width : 0f;
+            if (w > 1f)
+            {
+                int s = Mathf.Clamp(Mathf.FloorToInt(w) - 6, 200, cap);
+                var le = board.GetComponent<UnityEngine.UI.LayoutElement>();
+                if (le != null) { le.minWidth = s; le.preferredWidth = s; le.minHeight = s; le.preferredHeight = s; }
+                var brt = board.GetComponent<RectTransform>();
+                if (brt != null) UnityEngine.UI.LayoutRebuilder.MarkLayoutForRebuild(brt);
+                Behaviors.CoreUpdateBehavior.Actions.Remove(act);
+            }
+            else if (tries > 60) Behaviors.CoreUpdateBehavior.Actions.Remove(act);
+        };
+        Behaviors.CoreUpdateBehavior.Actions.Add(act);
+    }
+
+    // Apply deltas to the saved map-underlay bounds (the coordinate-overlay calibration), keep them valid, persist,
+    // refresh both map boards, and sync the four input fields. Moving = shift min+max together; stretching =
+    // expand/contract the span around its center.
+    private void NudgeFaustMapBounds(float dMinX, float dMaxX, float dMinZ, float dMaxZ)
+    {
+        float minX = Config.Settings.FaustWorldMapMinX + dMinX, maxX = Config.Settings.FaustWorldMapMaxX + dMaxX;
+        float minZ = Config.Settings.FaustWorldMapMinZ + dMinZ, maxZ = Config.Settings.FaustWorldMapMaxZ + dMaxZ;
+        if (maxX - minX < 50f) { var c = (minX + maxX) * 0.5f; minX = c - 25f; maxX = c + 25f; }   // keep a usable span
+        if (maxZ - minZ < 50f) { var c = (minZ + maxZ) * 0.5f; minZ = c - 25f; maxZ = c + 25f; }
+        Config.Settings.SetFaustWorldMapBounds(minX, maxX, minZ, maxZ);
+        SyncFaustMapBoundFields();
+        RefreshFaustMapUnderlays();
+    }
+
+    private void SyncFaustMapBoundFields()
+    {
+        var ci = System.Globalization.CultureInfo.InvariantCulture;
+        if (_faustWsMapMinX != null) _faustWsMapMinX.Text = Config.Settings.FaustWorldMapMinX.ToString("0", ci);
+        if (_faustWsMapMaxX != null) _faustWsMapMaxX.Text = Config.Settings.FaustWorldMapMaxX.ToString("0", ci);
+        if (_faustWsMapMinZ != null) _faustWsMapMinZ.Text = Config.Settings.FaustWorldMapMinZ.ToString("0", ci);
+        if (_faustWsMapMaxZ != null) _faustWsMapMaxZ.Text = Config.Settings.FaustWorldMapMaxZ.ToString("0", ci);
+    }
+
+    // Write the current calibration to the BepInEx log (and the in-panel notice) so it can be read back and baked
+    // in as the default. This is the "send it to the console" button.
+    private void LogFaustMapCalibration()
+    {
+        string line = $"MAP CALIBRATION  MinX={Config.Settings.FaustWorldMapMinX:0} MaxX={Config.Settings.FaustWorldMapMaxX:0} " +
+                      $"MinZ={Config.Settings.FaustWorldMapMinZ:0} MaxZ={Config.Settings.FaustWorldMapMaxZ:0}";
+        Utils.LogUtils.LogInfo($"[Faust] {line}");
+        FaustState.SetGateNotice($"Logged to BepInEx console → {line}");
+    }
+
+    // Build the space-free, comma-joined filter spec from the controls (the form Faust's VCF 0.10.4 needs).
+    private string BuildWorldScanSpec()
+    {
+        var parts = new System.Collections.Generic.List<string>();
+        // Category → server-side pre-filter (kind units/nodes + any catalog unittype/restier). When a category is
+        // selected it sets the kind; otherwise fall back to the Type dropdown. "filter down before scanning."
+        string cat = _faustWsCatIdx > 0 && _faustWsCatIdx <= _faustWsCats.Count ? _faustWsCats[_faustWsCatIdx - 1] : null;
+        string sub = _faustWsSubIdx > 0 && _faustWsSubIdx <= _faustWsSubs.Count ? _faustWsSubs[_faustWsSubIdx - 1] : null;
+        string catServer = FaustScanCatalog.ServerFilter(cat, sub);
+        bool haveKind = false;
+        if (!string.IsNullOrEmpty(catServer)) { parts.Add(catServer); haveKind = catServer.Contains("type="); }
+        if (!haveKind) parts.Add("type=" + (_faustWsTypeIdx == 1 ? "units" : _faustWsTypeIdx == 2 ? "nodes" : "all"));
+        var id = _faustWsId?.Text?.Trim();
+        if (!string.IsNullOrEmpty(id)) parts.Add($"id={id}");
+        var bt = _faustWsBloodType?.Text?.Trim();
+        if (!string.IsNullOrEmpty(bt)) parts.Add($"bloodtype={bt}");
+        if (_faustWsBloodQMin > 0) parts.Add($"bloodqmin={_faustWsBloodQMin}");
+        var ut = _faustWsUnitType?.Text?.Trim();
+        if (!string.IsNullOrEmpty(ut) && !catServer.Contains("unittype=")) parts.Add($"unittype={ut}");
+        return string.Join(",", parts);
+    }
+
+    private void RunWorldScan()
+    {
+        var id = _faustWsId?.Text?.Trim(); var bt = _faustWsBloodType?.Text?.Trim(); var ut = _faustWsUnitType?.Text?.Trim();
+        if (!BlankOrInt(id) || !BlankOrInt(bt))
+        { FaustState.SetGateNotice("Prefab ID and Blood type must be whole-number PrefabGUID hashes."); return; }
+        if (!BlankOrInt(ut))
+        { FaustState.SetGateNotice("Unit type must be a whole-number category (run .faust admin worldscandiag <name> on the server to find the values)."); return; }
+        FaustProtocolService.QueryWorldScan(BuildWorldScanSpec());
+    }
+
+    // #3: the map-underlay frame of reference (a coordinate grid always, + an optional drop-in world-map image).
+    // Calibration is SHARED by the World Map and the Heat Map (both read Settings.FaustWorldMap*).
+    private void BuildFaustMapUnderlayCard(GameObject page)
+    {
+        var card = AddCard(page, "FaustWsUnderlay");
+        AddSectionHeading(card, "Map underlay & frame of reference");
+        AddBodyText(card,
+            $"<color={Theme.MutedBodyHex}>Draw a <b>coordinate grid</b> (and an optional <b>world-map image</b>) behind the dots " +
+            "so positions have a real frame of reference. Applies to <b>both</b> the World Map and the player-position " +
+            "<b>Heat Map</b>. The map image fills the panel width; the <b>dot overlay</b> is calibrated separately (below) so " +
+            "the coordinates line up with the map.</color>");
+        AddBodyText(card,
+            $"<color={Theme.MutedBodyHex}>To use the real map art: capture it with the button below (or drop V Rising's " +
+            $"world-map texture in as {Mono("BepInEx/config/Raphael/worldmap.png")} and click <b>Reload image</b>). Then align the " +
+            "dot overlay with the calibration tool at the bottom.</color>");
+
+        AddFaustBoolToggle(card, "FaustWsGridToggle", "Show coordinate grid + axis labels",
+            Config.Settings.FaustWorldMapGrid, v => { Config.Settings.SetFaustWorldMapGrid(v); RefreshFaustMapUnderlays(); },
+            "Draw a 5×5 coordinate grid with corner world-coordinate labels behind the dots. No asset needed.");
+        AddFaustBoolToggle(card, "FaustWsImgToggle", "Show drop-in world-map image (worldmap.png)",
+            Config.Settings.FaustWorldMapImage, v => { Config.Settings.SetFaustWorldMapImage(v); RefreshFaustMapUnderlays(); },
+            "Draw config/Raphael/worldmap.png behind the dots when present (extract it from the game assets).");
+
+        // Opacity slider.
+        var orow = MakeFaustRow(card, "FaustWsMapOpacityRow");
+        AddFaustInlineLabel(orow, "WsMapOpLbl", "Image opacity:", 104);
+        var sliderGo = UIFactory.CreateSlider(orow, "FaustWsMapOpacity", out var oSlider);
+        UIFactory.SetLayoutElement(sliderGo, minWidth: 150, preferredWidth: 220, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        oSlider.minValue = 0; oSlider.maxValue = 100; oSlider.wholeNumbers = true; oSlider.value = Mathf.RoundToInt(Config.Settings.FaustWorldMapOpacity * 100f);
+        var oLbl = UIFactory.CreateLabel(orow, "FaustWsMapOpVal", $"{Mathf.RoundToInt(Config.Settings.FaustWorldMapOpacity * 100f)}%", TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
+        UIFactory.SetLayoutElement(oLbl.GameObject, minWidth: Theme.ScaledWidth(48), preferredWidth: Theme.ScaledWidth(52), flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        _faustWsMapOpacityLabel = oLbl.TextMesh;
+        oSlider.onValueChanged.AddListener((UnityEngine.Events.UnityAction<float>)(v =>
+        {
+            int pct = Mathf.Clamp(Mathf.RoundToInt(v), 0, 100);
+            Config.Settings.SetFaustWorldMapOpacity(pct / 100f);
+            if (_faustWsMapOpacityLabel != null) _faustWsMapOpacityLabel.text = $"{pct}%";
+            RefreshFaustMapUnderlays();
+        }));
+
+        // Calibration bounds (world coords the image's edges map to).
+        _faustWsMapMinX = AddFaustLabeledInput(card, "FaustWsMapMinX", "World X at left edge",   Config.Settings.FaustWorldMapMinX.ToString("0", System.Globalization.CultureInfo.InvariantCulture));
+        _faustWsMapMaxX = AddFaustLabeledInput(card, "FaustWsMapMaxX", "World X at right edge",  Config.Settings.FaustWorldMapMaxX.ToString("0", System.Globalization.CultureInfo.InvariantCulture));
+        _faustWsMapMinZ = AddFaustLabeledInput(card, "FaustWsMapMinZ", "World Z at bottom edge", Config.Settings.FaustWorldMapMinZ.ToString("0", System.Globalization.CultureInfo.InvariantCulture));
+        _faustWsMapMaxZ = AddFaustLabeledInput(card, "FaustWsMapMaxZ", "World Z at top edge",    Config.Settings.FaustWorldMapMaxZ.ToString("0", System.Globalization.CultureInfo.InvariantCulture));
+        if (_faustWsMapMinX != null) _faustWsMapMinX.Text = Config.Settings.FaustWorldMapMinX.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        if (_faustWsMapMaxX != null) _faustWsMapMaxX.Text = Config.Settings.FaustWorldMapMaxX.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        if (_faustWsMapMinZ != null) _faustWsMapMinZ.Text = Config.Settings.FaustWorldMapMinZ.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        if (_faustWsMapMaxZ != null) _faustWsMapMaxZ.Text = Config.Settings.FaustWorldMapMaxZ.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+
+        _faustWsMapImgStatus = AddBodyText(card, FaustMapBackdrop.StatusLine(), Theme.ScaledUI(11));
+
+        var brow = MakeFaustRow(card, "FaustWsMapCalibRow");
+        AddFaustButton(brow, "FaustWsMapApply", "Apply calibration",
+            "Save the four world-edge values (the world rectangle the map image / grid covers) and redraw.",
+            () => ApplyFaustMapCalibration(), 150);
+        AddFaustButton(brow, "FaustWsMapReload", "Reload image",
+            "Re-read config/Raphael/worldmap.png from disk (use after dropping in or replacing the file).",
+            () => { FaustMapBackdrop.Reset(); if (_faustWsMapImgStatus != null) _faustWsMapImgStatus.text = FaustMapBackdrop.StatusLine(); RefreshFaustMapUnderlays(); }, 130);
+
+        // Runtime capture: pull the map texture straight from the running game (the assets are in hashed archives,
+        // so there's no loose file to copy — this is the automated route, no external tools).
+        AddCfgHint(card, "FaustWsMapCapHint",
+            "Get the image straight from the game: <b>open the in-game map (press M) once</b> so it's loaded, then click " +
+            "Capture below. It saves the best-matching texture to worldmap.png automatically. If the captured image isn't " +
+            "the map, the BepInEx log lists every candidate texture name — type part of the right name in the filter and capture again.");
+        _faustWsMapCapFilter = AddFaustLabeledInput(card, "FaustWsMapCapFilter", "Texture name filter (optional)", "e.g. map / world / minimap");
+        var caprow = MakeFaustRow(card, "FaustWsMapCapRow");
+        AddFaustButton(caprow, "FaustWsMapCapture", "Capture map from game",
+            "Scan the game's loaded textures, log the candidates, and save the best match (or the best one matching the " +
+            "filter) to worldmap.png. Open the in-game map first so the texture is in memory.",
+            () => {
+                var rep = FaustMapCapture.Capture(_faustWsMapCapFilter?.Text?.Trim());
+                FaustState.SetGateNotice(rep);
+                FaustMapBackdrop.Reset();
+                if (_faustWsMapImgStatus != null) _faustWsMapImgStatus.text = FaustMapBackdrop.StatusLine();
+                RefreshFaustMapUnderlays();
+            }, 200);
+        AddFaustButton(brow, "FaustWsMapUseHeat", "Use heat-map bounds",
+            "Fill the calibration with Faust's authoritative full-map bounds from the last Heat Map query (a good starting point).",
+            () => UseHeatmapBoundsForMap(), 180);
+
+        // ---- Live coordinate-overlay calibration (admin / diagnostic) ----
+        // The map image stays put; these nudge the DOT overlay over it. Align it by eye, then "Log calibration"
+        // writes the values to the BepInEx console so they can be read back and baked in as the default.
+        AddSectionHeading(card, "Coordinate overlay calibration");
+        AddBodyText(card,
+            $"<color={Theme.MutedBodyHex}>Run a scan / heat map so the dots show, then <b>move</b> and <b>stretch</b> the dot " +
+            "overlay over the fixed map until it lines up. When it's aligned, click <b>Log calibration</b> — the values print to " +
+            "the BepInEx console so they can be set as the baseline. (This nudges the coordinate overlay only, not the map image.)</color>");
+
+        var stepRow = MakeFaustRow(card, "FaustWsMapStepRow");
+        AddFaustInlineLabel(stepRow, "WsMapStepLbl", "Step:", 48);
+        _faustWsMapStepBtn = AddFaustButton(stepRow, "FaustWsMapStep", $"{_faustWsMapNudgeStep}",
+            "World-unit amount each Move/Stretch click changes. Click to cycle 10 → 25 → 50 → 100 → 250.",
+            () => { _faustWsMapNudgeStep = _faustWsMapNudgeStep switch { 10 => 25, 25 => 50, 50 => 100, 100 => 250, _ => 10 }; SetFaustButtonText(_faustWsMapStepBtn, $"{_faustWsMapNudgeStep}"); }, 70);
+
+        var moveRow = MakeFaustRow(card, "FaustWsMapMoveRow");
+        AddFaustInlineLabel(moveRow, "WsMapMoveLbl", "Move dots:", 84);
+        float S() => _faustWsMapNudgeStep;
+        AddFaustButton(moveRow, "WsMoveL", "◄", "Move the dot overlay left.",  () => NudgeFaustMapBounds(+S(), +S(), 0, 0), 44);
+        AddFaustButton(moveRow, "WsMoveR", "►", "Move the dot overlay right.", () => NudgeFaustMapBounds(-S(), -S(), 0, 0), 44);
+        AddFaustButton(moveRow, "WsMoveU", "▲", "Move the dot overlay up.",    () => NudgeFaustMapBounds(0, 0, -S(), -S()), 44);
+        AddFaustButton(moveRow, "WsMoveD", "▼", "Move the dot overlay down.",  () => NudgeFaustMapBounds(0, 0, +S(), +S()), 44);
+
+        var stretchRow = MakeFaustRow(card, "FaustWsMapStretchRow");
+        AddFaustInlineLabel(stretchRow, "WsMapStretchLbl", "Stretch:", 84);
+        AddFaustButton(stretchRow, "WsWider",  "Wider",   "Spread the dots farther apart horizontally.", () => NudgeFaustMapBounds(+S() / 2f, -S() / 2f, 0, 0), 78);
+        AddFaustButton(stretchRow, "WsNarrow", "Narrower", "Pull the dots closer together horizontally.", () => NudgeFaustMapBounds(-S() / 2f, +S() / 2f, 0, 0), 84);
+        AddFaustButton(stretchRow, "WsTaller", "Taller",  "Spread the dots farther apart vertically.",   () => NudgeFaustMapBounds(0, 0, +S() / 2f, -S() / 2f), 78);
+        AddFaustButton(stretchRow, "WsShorter", "Shorter", "Pull the dots closer together vertically.",  () => NudgeFaustMapBounds(0, 0, -S() / 2f, +S() / 2f), 84);
+
+        var logRow = MakeFaustRow(card, "FaustWsMapLogRow");
+        AddFaustButton(logRow, "FaustWsMapLog", "Log calibration", "Write the current 4 bound values to the BepInEx console (and the notice below) so they can be set as the baseline.", () => LogFaustMapCalibration(), 150);
+    }
+
+    private void ApplyFaustMapCalibration()
+    {
+        if (!float.TryParse(_faustWsMapMinX?.Text?.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var minX)
+         || !float.TryParse(_faustWsMapMaxX?.Text?.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var maxX)
+         || !float.TryParse(_faustWsMapMinZ?.Text?.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var minZ)
+         || !float.TryParse(_faustWsMapMaxZ?.Text?.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var maxZ))
+        { FaustState.SetGateNotice("Calibration values must be numbers (world coordinates)."); return; }
+        if (maxX <= minX || maxZ <= minZ) { FaustState.SetGateNotice("Right edge must be > left edge, and top > bottom."); return; }
+        Config.Settings.SetFaustWorldMapBounds(minX, maxX, minZ, maxZ);
+        RefreshFaustMapUnderlays();
+    }
+
+    // Redraw both map boards (World Map + Heat Map) after an underlay/calibration change. Each refresh self-guards
+    // when its board isn't built (the other tab isn't open), so calling both is safe.
+    private void RefreshFaustMapUnderlays() { RefreshFaustWorldScan(); RefreshFaustHeatmap(); }
+
+    // When a map IMAGE is shown, widen the shorter axis of the calibrated world rect so its aspect ratio matches
+    // the image's pixel aspect (the V Rising map is square). Without this, a square map stretched into a non-square
+    // calibration rect looks vertically/horizontally skewed. Center-preserving (only expands), so dots and image
+    // share one undistorted space. No-op when there's no image (grid-only keeps the rect as entered).
+    private static void FaustMatchRectToImageAspect(ref float minX, ref float maxX, ref float minZ, ref float maxZ)
+    {
+        if (!FaustMapBackdrop.HasImage) return;
+        float imgAspect = FaustMapBackdrop.ImageAspect;            // width / height
+        if (imgAspect <= 0f) return;
+        float spanX = maxX - minX, spanZ = maxZ - minZ;
+        if (spanX <= 0f || spanZ <= 0f) return;
+        float curAspect = spanX / spanZ;
+        if (curAspect < imgAspect)                                  // rect too narrow → widen X
+        {
+            float newSpanX = spanZ * imgAspect, cx = (minX + maxX) * 0.5f;
+            minX = cx - newSpanX * 0.5f; maxX = cx + newSpanX * 0.5f;
+        }
+        else if (curAspect > imgAspect)                             // rect too wide → grow Z
+        {
+            float newSpanZ = spanX / imgAspect, cz = (minZ + maxZ) * 0.5f;
+            minZ = cz - newSpanZ * 0.5f; maxZ = cz + newSpanZ * 0.5f;
+        }
+    }
+
+    private void UseHeatmapBoundsForMap()
+    {
+        var h = FaustState.HeatmapHeader;
+        if (h == null || !h.HasMapBounds) { FaustState.SetGateNotice("No heat-map bounds yet — run a Heat Map query first (needs Faust api 17+)."); return; }
+        float minX = h.MapMinCx * h.Cell, maxX = (h.MapMaxCx + 1) * h.Cell;
+        float minZ = h.MapMinCz * h.Cell, maxZ = (h.MapMaxCz + 1) * h.Cell;
+        Config.Settings.SetFaustWorldMapBounds(minX, maxX, minZ, maxZ);
+        if (_faustWsMapMinX != null) _faustWsMapMinX.Text = minX.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        if (_faustWsMapMaxX != null) _faustWsMapMaxX.Text = maxX.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        if (_faustWsMapMinZ != null) _faustWsMapMinZ.Text = minZ.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        if (_faustWsMapMaxZ != null) _faustWsMapMaxZ.Text = maxZ.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        RefreshFaustMapUnderlays();
+    }
+
+    private void BuildFaustWorldScanTab(GameObject page)
+    {
+        EnsureFaustSubscribed();
+        page = BeginAdminGate(page);   // worldscan is AdminOnly-default (economy/PvP-sensitive); server still enforces
+
+        AddFaustGateNotice(page);
+        var intro = AddCard(page, "FaustWsIntro");
+        AddSectionHeading(intro, "World map — units & resource nodes");
+        AddBodyText(intro,
+            "A filterable map of <b>NPC units</b> (with blood type / quality) and <b>resource nodes</b> across the " +
+            "whole world — Faust scans server-side and sends the results. Filter by type, a specific prefab, blood " +
+            $"type, or a minimum blood quality, then read them as a table and an X/Z map. Served by {Mono(".faust api worldscan")} " +
+            "(Faust 0.16+).");
+        AddBodyText(intro, FaustFeatureHint("worldscan"));
+        AddBodyText(intro,
+            $"<color={Theme.MutedBodyHex}>Only <b>whitelisted</b> prefabs are returned (admin-curated below); " +
+            "V Bloods are excluded — use the <b>Boss Status</b> tab for those.</color>");
+        if (FaustState.Present && !FaustState.SupportsWorldScan)
+            AddBodyText(intro,
+                $"<color=#FFB070>This server's Faust is older than 0.16 (API {FaustState.ApiVersion}) and doesn't have the world map yet — “Scan” will time out.</color>");
+
+        // ---- Filters ----
+        var fcard = AddCard(page, "FaustWsFilters");
+        AddSectionHeading(fcard, "Filters");
+        _faustWsTypeDd = AddFaustLabeledDropdown(fcard, "FaustWsType", "Type", FaustWsTypes, idx =>
+        { _faustWsTypeIdx = Mathf.Clamp(idx, 0, FaustWsTypes.Length - 1); }, 180);
+        _faustWsTypeDd.SetValueWithoutNotify(Mathf.Clamp(_faustWsTypeIdx, 0, FaustWsTypes.Length - 1));
+
+        // Cascading Category → Type dropdowns (from the curated catalog + scan results — no GUIDs to type). The
+        // Category also pre-filters the scan SERVER-SIDE (units vs nodes, plus any catalog unittype/restier), so a
+        // narrowed scan pulls less; the client then narrows the displayed rows to the exact Category / Type.
+        _faustWsCatDd = AddFaustLabeledDropdown(fcard, "FaustWsCat", "Category", new[] { "All" }, idx =>
+        {
+            if (_faustWsSuppressDd) return;
+            _faustWsCatIdx = idx; _faustWsSubIdx = 0; RefreshFaustWorldScan();
+        }, 240);
+        _faustWsSubDd = AddFaustLabeledDropdown(fcard, "FaustWsSub", "Type (sub)", new[] { "All" }, idx =>
+        {
+            if (_faustWsSuppressDd) return;
+            _faustWsSubIdx = idx; RefreshFaustWorldScan();
+        }, 240);
+        AddCfgHint(fcard, "FaustWsGroupHint",
+            "Pick a <b>Category</b> (e.g. “Resource · Ore”) and <b>Type</b> (e.g. “Copper”) <b>before</b> scanning — the lists come " +
+            "from a built-in catalog, and the Category pre-filters the scan server-side (units vs nodes) so it pulls less. " +
+            $"Extend the catalog at {Mono("config/Raphael/worldscan_categories.txt")} (format: <i>Category | Type | keywords | " +
+            "[unittype=N|restier=N]</i>). <b>No nodes showing?</b> Whitelist them on the server (Admin: Control → World scan → " +
+            "Seed defaults).");
+
+        // Scan button + status sit right under the dropdowns (the everyday controls).
+        var srow = MakeFaustRow(fcard, "FaustWsScanRow");
+        AddFaustButton(srow, "FaustWsScan", "Scan world",
+            "Run the filtered world scan (.faust api worldscan <spec>). Faust reuses a cached snapshot, so rapid re-scans just re-filter it.",
+            () => RunWorldScan(), 160);
+        _faustWsStatus = AddBodyText(fcard, "—", Theme.ScaledUI(11));
+
+        // Advanced, GUID-level filters tucked into a collapsed section so the main Filters card stays tidy.
+        Raphael.UI.Forms.CollapsibleSection.Build(fcard, "Advanced filters (prefab / blood / unit category)",
+            startExpanded: false, content => BuildFaustWsAdvancedFilters(content));
+
+        // ---- Map ----
+        var mapCard = AddCard(page, "FaustWsMapCard");
+        AddSectionHeading(mapCard, "Map (X / Z)");
+        _faustWsMapGo = UIFactory.CreateVerticalGroup(mapCard, "FaustWsMap",
+            forceWidth: true, forceHeight: false, childControlWidth: true, childControlHeight: true,
+            spacing: 4, padding: new Vector4(0, 0, 0, 0));
+        UIFactory.SetLayoutElement(_faustWsMapGo, minWidth: 360, preferredWidth: 400, flexibleWidth: 1, minHeight: 24, flexibleHeight: 0);
+
+        // ---- Table ---- (kept right under the map; the underlay/calibration controls collapse below it)
+        var listCard = AddCard(page, "FaustWsListCard");
+        AddSectionHeading(listCard, "Assets");
+        _faustWsListGo = MakeFaustListContainer(listCard, "FaustWsRows");
+
+        // #4: map underlay & coordinate-overlay calibration collapsed by default (expand to set up the map image).
+        Raphael.UI.Forms.CollapsibleSection.Build(page, "Map underlay & coordinate overlay",
+            startExpanded: false, content => BuildFaustMapUnderlayCard(content),
+            "Set up the world-map background image and align the coordinate overlay. Shared with the Heat Map.");
+
+        AddBodyText(page,
+            $"<color={Theme.MutedBodyHex}>Admin tools for the world scan — managing the prefab <b>whitelist</b> and the " +
+            $"<b>prefab lookup / diagnostics</b> — live on the <b>Admin: Control</b> tab.</color>");
+
+        RefreshFaustWorldScan();
+    }
+
+    // The GUID-level world-scan filters (prefab id / blood type / unit category / min blood quality). Tucked into
+    // a collapsible so the everyday Type + Category dropdowns aren't crowded.
+    private void BuildFaustWsAdvancedFilters(GameObject parent)
+    {
+        _faustWsId = AddFaustLabeledInput(parent, "FaustWsId", "Prefab ID (optional)", "PrefabGUID hash");
+        _faustWsBloodType = AddFaustLabeledInput(parent, "FaustWsBlood", "Blood type (optional)", "blood PrefabGUID hash");
+        _faustWsUnitType = AddFaustLabeledInput(parent, "FaustWsUnitType", "Unit category (optional)", "category number");
+        AddCfgHint(parent, "FaustWsUtHint", "Filter NPC units to one EntityCategory.UnitCategory (implies Units). Find the numbers with .faust admin worldscandiag <name> on the server.");
+
+        var qrow = MakeFaustRow(parent, "FaustWsQRow");
+        AddFaustInlineLabel(qrow, "WsQLbl", "Min blood Q:", 96);
+        var sliderGo = UIFactory.CreateSlider(qrow, "FaustWsQSlider", out var qSlider);
+        UIFactory.SetLayoutElement(sliderGo, minWidth: 150, preferredWidth: 220, flexibleWidth: 1, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        qSlider.minValue = 0; qSlider.maxValue = 100; qSlider.wholeNumbers = true; qSlider.value = _faustWsBloodQMin;
+        var qLbl = UIFactory.CreateLabel(qrow, "FaustWsQVal", $"{_faustWsBloodQMin}%", TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(12));
+        UIFactory.SetLayoutElement(qLbl.GameObject, minWidth: Theme.ScaledWidth(48), preferredWidth: Theme.ScaledWidth(52), flexibleWidth: 0, minHeight: 22, preferredHeight: 24, flexibleHeight: 0);
+        _faustWsBloodQLabel = qLbl.TextMesh;
+        qSlider.onValueChanged.AddListener((UnityEngine.Events.UnityAction<float>)(v =>
+        {
+            _faustWsBloodQMin = Mathf.Clamp(Mathf.RoundToInt(v), 0, 100);
+            if (_faustWsBloodQLabel != null) _faustWsBloodQLabel.text = $"{_faustWsBloodQMin}%";
+        }));
+        AddCfgHint(parent, "FaustWsQHint", "Only NPC units with blood quality ≥ this are returned (0 = no blood filter). Applies to Units.");
+    }
+
+    // The world-scan ADMIN cards (whitelist management + prefab lookup / diagnostics). Built on the Faust →
+    // Admin: Control tab (moved off the player-facing World Map tab).
+    private void BuildFaustWorldScanAdminCards(GameObject page)
+    {
+        var wlCard = AddCard(page, "FaustWsWhitelist");
+        AddSectionHeading(wlCard, "World scan — whitelist");
+        AddBodyText(wlCard,
+            $"<color={Theme.MutedBodyHex}>The <b>World Map</b> scan only returns prefabs on Faust's whitelist. Manage it here " +
+            "(replies appear in chat). <b>Seed</b> repopulates the default comprehensive set (the easiest way to get " +
+            "resource nodes + NPCs showing).</color>");
+        _faustWsAdminGuid = AddFaustLabeledInput(wlCard, "FaustWsAdminGuid", "Prefab GUID", "hash to add / remove");
+        var wlRow = MakeFaustRow(wlCard, "FaustWsWlRow");
+        AddFaustButton(wlRow, "FaustWsWlList", "List",
+            "List the whitelisted prefabs (.faust admin worldscan list).",
+            () => FaustClient.AdminWorldScan("list"), 80);
+        AddFaustButton(wlRow, "FaustWsWlAdd", "Add",
+            "Add the typed PrefabGUID to the whitelist (.faust admin worldscan add <guid>).",
+            () => { var g = _faustWsAdminGuid?.Text?.Trim(); if (BlankOrInt(g) && !string.IsNullOrEmpty(g)) FaustClient.AdminWorldScan("add", g); else FaustState.SetGateNotice("Enter a whole-number PrefabGUID to add."); }, 80);
+        AddFaustButton(wlRow, "FaustWsWlRemove", "Remove",
+            "Remove the typed PrefabGUID from the whitelist (.faust admin worldscan remove <guid>).",
+            () => { var g = _faustWsAdminGuid?.Text?.Trim(); if (BlankOrInt(g) && !string.IsNullOrEmpty(g)) FaustClient.AdminWorldScan("remove", g); else FaustState.SetGateNotice("Enter a whole-number PrefabGUID to remove."); }, 90);
+        var wlRow2 = MakeFaustRow(wlCard, "FaustWsWlRow2");
+        AddFaustButton(wlRow2, "FaustWsWlSeed", "Seed defaults",
+            "Repopulate the whitelist with Faust's default comprehensive set (.faust admin worldscan seed).",
+            () => FaustClient.AdminWorldScan("seed"), 130);
+        AddFaustButton(wlRow2, "FaustWsWlClear", "Clear all",
+            "Clear the whole whitelist — nothing will scan until you add or seed (.faust admin worldscan clear).",
+            () => FaustClient.AdminWorldScan("clear"), 110);
+
+        var pfCard = AddCard(page, "FaustWsPrefab");
+        AddSectionHeading(pfCard, "World scan — prefab lookup & diagnostics");
+        AddBodyText(pfCard,
+            $"<color={Theme.MutedBodyHex}>Find a PrefabGUID for the whitelist / item-cost / proximity fields without leaving the " +
+            $"game: type a numeric <b>ID</b> to get its dev-name, or a <b>partial name</b> to search. Replies appear in chat. " +
+            $"Served by {Mono(".faust admin prefab")} (Faust 0.16+).</color>");
+        _faustWsPrefabQuery = AddFaustLabeledInput(pfCard, "FaustWsPrefabQuery", "ID or name", "GUID hash or name fragment");
+        var pfRow = MakeFaustRow(pfCard, "FaustWsPrefabRow");
+        AddFaustButton(pfRow, "FaustWsPrefabFind", "Find prefab",
+            "Resolve a PrefabGUID to its name, or search the catalog by a partial name (.faust admin prefab <id|name>).",
+            () => { var q = _faustWsPrefabQuery?.Text?.Trim(); if (!string.IsNullOrEmpty(q)) FaustClient.AdminPrefab(q); else FaustState.SetGateNotice("Enter a PrefabGUID hash or a name fragment to search."); }, 120);
+        AddFaustButton(pfRow, "FaustWsDiag", "Audit scan",
+            "Dump a prefab's category numbers + Faust's unit/node verdict so you can set the unit-category filter (.faust admin worldscandiag <name>). Uses the name/ID above (blank = all).",
+            () => FaustClient.AdminWorldScanDiag(_faustWsPrefabQuery?.Text?.Trim()), 110);
+    }
+
+    // Friendly-ish asset name: prettify the prefab dev-name (items strip cleanly; CHAR_* units get a tidy form).
+    private static string FaustAssetName(FaustAsset a)
+    {
+        var raw = (a?.Name ?? "").Trim();
+        if (string.IsNullOrEmpty(raw)) return a != null && a.Guid != 0 ? $"#{a.Guid}" : "—";
+        // FaustNames.Item prettifies item/prefab dev-names (Item_/TM_/BP_ prefixes etc.).
+        var pretty = FaustNames.Item(a.Guid, raw);
+        return string.IsNullOrEmpty(pretty) || pretty == "—" ? raw.Replace('_', ' ') : pretty;
+    }
+
+    // Build the Category/Type cycler lists from the current scan, clamp the indices, update the button labels,
+    // and return the client-side-filtered asset list (also out the active filters for the status line).
+    // Rebuild the Category list from the CATALOG (so it's usable before a scan) merged with any categories present
+    // in the current results, clamp the index, update the Category button label, and return the active filter.
+    private string BuildFaustWsCategoryList()
+    {
+        _faustWsCats.Clear();
+        foreach (var c in FaustScanCatalog.Categories) if (!_faustWsCats.Contains(c)) _faustWsCats.Add(c);
+        foreach (var a in FaustState.WorldAssets)
+        {
+            var (cat, _) = FaustScanCatalog.Classify(a);
+            if (!_faustWsCats.Contains(cat)) _faustWsCats.Add(cat);
+        }
+        if (_faustWsCatIdx > _faustWsCats.Count) _faustWsCatIdx = 0;
+        string catFilter = _faustWsCatIdx == 0 ? null : _faustWsCats[_faustWsCatIdx - 1];
+        // Repopulate the Category dropdown: option [0] = "All (N)", then each category. Suppress onChanged.
+        if (_faustWsCatDd != null)
+        {
+            var opts = new System.Collections.Generic.List<string>(_faustWsCats.Count + 1) { $"All ({_faustWsCats.Count})" };
+            opts.AddRange(_faustWsCats);
+            _faustWsSuppressDd = true;
+            SetFaustDropdownOptions(_faustWsCatDd, opts, _faustWsCatIdx);
+            _faustWsSuppressDd = false;
+        }
+        return catFilter;
+    }
+
+    // Rebuild the Type list = the catalog's curated types for the category PLUS any types found in the results,
+    // clamp, update the Type button label, and return the active type filter.
+    private string BuildFaustWsTypeList(string catFilter)
+    {
+        _faustWsSubs.Clear();
+        if (catFilter != null) foreach (var t in FaustScanCatalog.TypesFor(catFilter)) if (!_faustWsSubs.Contains(t)) _faustWsSubs.Add(t);
+        foreach (var a in FaustState.WorldAssets)
+        {
+            var (cat, type) = FaustScanCatalog.Classify(a);
+            if (catFilter != null && !string.Equals(cat, catFilter, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!_faustWsSubs.Contains(type)) _faustWsSubs.Add(type);
+        }
+        if (_faustWsSubIdx > _faustWsSubs.Count) _faustWsSubIdx = 0;
+        string subFilter = _faustWsSubIdx == 0 ? null : _faustWsSubs[_faustWsSubIdx - 1];
+        // Repopulate the Type (sub) dropdown: option [0] = "All (N)", then each type. Suppress onChanged.
+        if (_faustWsSubDd != null)
+        {
+            var opts = new System.Collections.Generic.List<string>(_faustWsSubs.Count + 1) { $"All ({_faustWsSubs.Count})" };
+            opts.AddRange(_faustWsSubs);
+            _faustWsSuppressDd = true;
+            SetFaustDropdownOptions(_faustWsSubDd, opts, _faustWsSubIdx);
+            _faustWsSuppressDd = false;
+        }
+        return subFilter;
+    }
+
+    private System.Collections.Generic.List<FaustAsset> FaustWorldScanFiltered(out string catFilter, out string subFilter)
+    {
+        catFilter = BuildFaustWsCategoryList();
+        subFilter = BuildFaustWsTypeList(catFilter);
+
+        var shown = new System.Collections.Generic.List<FaustAsset>(FaustState.WorldAssets.Count);
+        foreach (var a in FaustState.WorldAssets)
+        {
+            var (cat, type) = FaustScanCatalog.Classify(a);
+            if (catFilter != null && !string.Equals(cat, catFilter, StringComparison.OrdinalIgnoreCase)) continue;
+            if (subFilter != null && !string.Equals(type, subFilter, StringComparison.OrdinalIgnoreCase)) continue;
+            shown.Add(a);
+        }
+        return shown;
+    }
+
+    private void RefreshFaustWorldScan()
+    {
+        bool ready = FaustState.WorldScanStatus == FaustQueryStatus.Ready && FaustState.WorldAssets.Count > 0;
+        // Always rebuild the Category/Type pickers (from the catalog) so they're usable BEFORE a scan — the user
+        // can pre-select what they're after, then scan.
+        var shown = FaustWorldScanFiltered(out var catFilter, out var subFilter);
+        if (!ready) shown.Clear();
+        string filterLabel = "";
+        if (ready)
+        {
+            string cat = _faustWsCatIdx == 0 ? null : (_faustWsCatIdx <= _faustWsCats.Count ? _faustWsCats[_faustWsCatIdx - 1] : null);
+            string sub = _faustWsSubIdx == 0 ? null : (_faustWsSubIdx <= _faustWsSubs.Count ? _faustWsSubs[_faustWsSubIdx - 1] : null);
+            if (cat != null) filterLabel = $" · showing {shown.Count} of {FaustState.WorldAssets.Count} ({cat}{(sub != null ? " · " + sub : "")})";
+        }
+
+        if (_faustWsStatus != null)
+        {
+            string baseMsg = $"{FaustState.WorldScanTotalCount} asset(s) · filter [{FaustState.WorldScanSpec}]{filterLabel}";
+            string trunc = FaustState.WorldScanTruncated
+                ? "  <color=#FFB070>(server hit its result cap — narrow the scan, or raise <b>worldscanmaxresults</b> on the server via Admin: Control → global settings, e.g. 0 = unlimited)</color>"
+                : "";
+            _faustWsStatus.text = StatusColored(FaustState.WorldScanStatus, baseMsg + trunc, FaustState.WorldScanError,
+                "Set filters and click “Scan world”.");
+        }
+
+        // Map (uses the client-side-filtered subset)
+        if (_faustWsMapGo != null)
+        {
+            ClearChildren(_faustWsMapGo);
+            if (ready && shown.Count > 0)
+                BuildFaustAssetMap(_faustWsMapGo, shown);
+            else if (ready)
+                AddFaustListLine(_faustWsMapGo, "WsMapNone", $"<color={Theme.MutedBodyHex}>No assets match the Category / Type filter.</color>", Theme.ScaledUI(11));
+            else
+                AddFaustListLine(_faustWsMapGo, "WsMapNone", $"<color={Theme.MutedBodyHex}>Run a scan to plot assets on the map.</color>", Theme.ScaledUI(11));
+        }
+
+        // Table
+        if (_faustWsListGo == null) return;
+        ClearChildren(_faustWsListGo);
+        if (FaustState.WorldScanStatus != FaustQueryStatus.Ready) return;
+        if (FaustState.WorldAssets.Count == 0)
+        {
+            AddFaustListLine(_faustWsListGo, "WsEmpty", $"<color={Theme.MutedBodyHex}>No assets matched the filter (or none whitelisted).</color>", Theme.ScaledUI(11));
+            return;
+        }
+        if (shown.Count == 0)
+        {
+            AddFaustListLine(_faustWsListGo, "WsEmpty2", $"<color={Theme.MutedBodyHex}>No assets match the Category / Type filter — cycle Category back to All.</color>", Theme.ScaledUI(11));
+            return;
+        }
+        var cols = new[]
+        {
+            new FaustCol(Theme.ScaledWidth(150), 1, TextAlignmentOptions.MidlineLeft),  // Name
+            new FaustCol(Theme.ScaledWidth(70),  0, TextAlignmentOptions.MidlineLeft),  // Kind (+ category/tier)
+            new FaustCol(Theme.ScaledWidth(86),  0, TextAlignmentOptions.MidlineLeft),  // Region
+            new FaustCol(Theme.ScaledWidth(108), 0, TextAlignmentOptions.MidlineLeft),  // Blood type
+            new FaustCol(Theme.ScaledWidth(52),  0, TextAlignmentOptions.MidlineRight), // Blood Q%
+            new FaustCol(Theme.ScaledWidth(88),  0, TextAlignmentOptions.MidlineRight), // Loc
+        };
+        AddFaustHeaderRow(_faustWsListGo, "WsHdr", cols, new[] { "Name", "Kind", "Region", "Blood", "Q", "Loc (X,Z)" });
+        int i = 0;
+        foreach (var a in shown)
+        {
+            string kindExtra = a.IsUnit
+                ? (a.UnitType >= 0 ? $" <color=#888888>c{a.UnitType}</color>" : "")
+                : (a.ResTier  >= 0 ? $" <color=#888888>t{a.ResTier}</color>"  : "");
+            string kind = (a.IsUnit ? "unit" : "<color=#8FBF6F>node</color>") + kindExtra;
+            string bloodType = !a.IsUnit ? "<color=#888888>—</color>"
+                : (a.HasBlood ? (string.IsNullOrEmpty(a.BloodType) ? "?" : a.BloodType.Replace('_', ' ')) : "<color=#888888>—</color>");
+            string bloodQ = (a.IsUnit && a.HasBlood) ? FaustBloodQColored(a.BloodQuality) : "<color=#888888>—</color>";
+            string loc = a.HasPos ? FaustLocCell(a.X, a.Z) : "<color=#888888>—</color>";
+            AddFaustCellRow(_faustWsListGo, $"Ws{i++}", cols, new[] { FaustAssetName(a), kind, FaustRegionCell(a.Region), bloodType, bloodQ, loc });
+        }
+    }
+
+    private static string FaustBloodQColored(int q)
+    {
+        if (q < 0) return "";
+        string c = q >= 80 ? "#FFD75A" : (q >= 50 ? "#E0B060" : "#B0B0B0");
+        return $"<color={c}>{q}%</color>";
+    }
+
+    // X/Z plot of the assets (+X→right +Z→up). Units coloured by blood quality, nodes green. When a map backdrop
+    // is active (grid and/or drop-in worldmap.png — Settings.FaustWorldMap*), the board is drawn to the FIXED
+    // calibrated world rectangle so the dots line up with the map art; otherwise it auto-fits to the data.
+    private void BuildFaustAssetMap(GameObject parent, System.Collections.Generic.IReadOnlyList<FaustAsset> assets)
+    {
+        float dMinX = float.MaxValue, dMinZ = float.MaxValue, dMaxX = float.MinValue, dMaxZ = float.MinValue;
+        int plotted = 0;
+        foreach (var a in assets) if (a.HasPos) { plotted++; if (a.X < dMinX) dMinX = a.X; if (a.X > dMaxX) dMaxX = a.X; if (a.Z < dMinZ) dMinZ = a.Z; if (a.Z > dMaxZ) dMaxZ = a.Z; }
+        if (plotted == 0) { AddFaustListLine(parent, "WsMapNoPos", $"<color={Theme.MutedBodyHex}>No mapped positions in this result.</color>", Theme.ScaledUI(11)); return; }
+
+        bool mapMode = FaustMapBackdrop.Active;
+        // Render rectangle (world coords). Map mode = the calibrated full-map rect; else fit to the data (+pad).
+        float wMinX, wMaxX, wMinZ, wMaxZ;
+        if (mapMode)
+        {
+            // The map IMAGE fills the (square) board; the DOTS are placed by these bounds, which the admin
+            // calibrates independently (X and Z separately) — so do NOT auto-square the rect here.
+            wMinX = Config.Settings.FaustWorldMapMinX; wMaxX = Config.Settings.FaustWorldMapMaxX;
+            wMinZ = Config.Settings.FaustWorldMapMinZ; wMaxZ = Config.Settings.FaustWorldMapMaxZ;
+            if (wMaxX <= wMinX) wMaxX = wMinX + 1f;
+            if (wMaxZ <= wMinZ) wMaxZ = wMinZ + 1f;
+        }
+        else { wMinX = dMinX; wMaxX = dMaxX; wMinZ = dMinZ; wMaxZ = dMaxZ; }
+
+        float spanX = Mathf.Max(1f, wMaxX - wMinX), spanZ = Mathf.Max(1f, wMaxZ - wMinZ);
+        int boardT = Theme.ScaledWidth(360);
+        float scale = boardT / Mathf.Max(spanX, spanZ);
+        int boardW = Mathf.Clamp(Mathf.CeilToInt(spanX * scale), 40, Theme.ScaledWidth(520));
+        int boardH = Mathf.Clamp(Mathf.CeilToInt(spanZ * scale), 40, Theme.ScaledWidth(520));
+        int dot = Mathf.Clamp(Theme.ScaledWidth(6), 4, 10);
+
+        var board = UIFactory.CreateUIObject("FaustWsBoard", parent);
+        var bg = board.AddComponent<UnityEngine.UI.Image>();
+        bg.color = new Color(0f, 0f, 0f, 0.45f); bg.raycastTarget = false;
+        // With a map IMAGE, let the board fill the panel width and hold the image's aspect via an AspectRatioFitter
+        // (the parent group force-expands width, which otherwise stretches the square map). Dots/grid use normalized
+        // anchors, so the exact pixel size doesn't matter. Without an image, keep the explicit data-fit size.
+        bool fitSquare = mapMode && FaustMapBackdrop.HasImage;
+        if (fitSquare)
+        {
+            // Square board (the map image is square) that fills the panel width — sized next frame once the
+            // container has been laid out. Fixed size → the parent reserves the height (no overlap with siblings).
+            int sq = boardT;
+            UIFactory.SetLayoutElement(board, minWidth: sq, preferredWidth: sq, flexibleWidth: 0, minHeight: sq, preferredHeight: sq, flexibleHeight: 0);
+            FillMapBoardToWidth(board, parent);
+        }
+        else
+            UIFactory.SetLayoutElement(board, minWidth: boardW, preferredWidth: boardW, flexibleWidth: 0, minHeight: boardH, preferredHeight: boardH, flexibleHeight: 0);
+
+        // Backdrop (image + grid) BEFORE the dots so it sits behind them.
+        if (mapMode) FaustMapBackdrop.Decorate(board, boardW, boardH, wMinX, wMaxX, wMinZ, wMaxZ);
+
+        int offMap = 0;
+        foreach (var a in assets)
+        {
+            if (!a.HasPos) continue;
+            float nx = (a.X - wMinX) / spanX, nz = (a.Z - wMinZ) / spanZ;
+            if (mapMode && (nx < 0f || nx > 1f || nz < 0f || nz > 1f)) { offMap++; continue; }   // outside the map rect
+            var d = UIFactory.CreateUIObject("wa", board);
+            var img = d.AddComponent<UnityEngine.UI.Image>();
+            img.color = a.IsUnit ? (a.HasBlood ? FaustBloodDotColor(a.BloodQuality) : new Color(0.56f, 0.56f, 0.78f, 0.95f))
+                                 : new Color(0.44f, 0.75f, 0.44f, 0.95f);   // node = green
+            img.raycastTarget = true;
+            var rt = d.GetComponent<RectTransform>();
+            // Normalized anchor: the dot sits at fraction (nx,nz) of the board regardless of its pixel size.
+            rt.anchorMin = new Vector2(nx, nz); rt.anchorMax = new Vector2(nx, nz); rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(dot, dot);
+            rt.anchoredPosition = Vector2.zero;
+            string blood = a.IsUnit && a.HasBlood ? $" · {(string.IsNullOrEmpty(a.BloodType) ? "?" : a.BloodType.Replace('_', ' '))} {a.BloodQuality}%" : "";
+            string cat = a.IsUnit ? (a.UnitType >= 0 ? $" · cat {a.UnitType}" : "") : (a.ResTier >= 0 ? $" · tier {a.ResTier}" : "");
+            TooltipHover.Attach(d, $"{FaustAssetName(a)} · {(a.IsUnit ? "unit" : "node")}{cat}{blood} · ({a.X:0},{a.Z:0}) {FaustRegionCell(a.Region)}");
+        }
+
+        // Legend.
+        string frame = mapMode
+            ? (FaustMapBackdrop.HasImage ? "map image + grid" : "coordinate grid") + $" · world X[{wMinX:0}..{wMaxX:0}] Z[{wMinZ:0}..{wMaxZ:0}]"
+            : "zoomed to data";
+        string offNote = offMap > 0 ? $" · <color=#FFB070>{offMap} off-map</color>" : "";
+        AddFaustListLine(parent, "WsMapCap",
+            $"<color={Theme.MutedBodyHex}>{plotted - offMap} plotted{offNote} · {frame} · +X→right, +Z→up (north) · " +
+            "<color=#6FBF6F>●</color> node  <color=#9090C8>●</color> unit  <color=#FFD75A>●</color> high-quality blood · hover a dot for detail</color>",
+            Theme.ScaledUI(10));
+    }
+
+    // Plot online players (FaustState.Positions) on the calibrated map — the live "Players now" alternative to the
+    // heat map. Each player is a bright dot with their name (optional label + always-on hover). Mirrors
+    // BuildFaustAssetMap's board setup so it lines up with the same map underlay / coordinate calibration.
+    private void BuildFaustPositionsMap(GameObject parent, System.Collections.Generic.IReadOnlyList<FaustPos> players)
+    {
+        float dMinX = float.MaxValue, dMinZ = float.MaxValue, dMaxX = float.MinValue, dMaxZ = float.MinValue;
+        foreach (var p in players) { if (p.X < dMinX) dMinX = p.X; if (p.X > dMaxX) dMaxX = p.X; if (p.Z < dMinZ) dMinZ = p.Z; if (p.Z > dMaxZ) dMaxZ = p.Z; }
+
+        bool mapMode = FaustMapBackdrop.Active;
+        float wMinX, wMaxX, wMinZ, wMaxZ;
+        if (mapMode)
+        {
+            wMinX = Config.Settings.FaustWorldMapMinX; wMaxX = Config.Settings.FaustWorldMapMaxX;
+            wMinZ = Config.Settings.FaustWorldMapMinZ; wMaxZ = Config.Settings.FaustWorldMapMaxZ;
+            if (wMaxX <= wMinX) wMaxX = wMinX + 1f;
+            if (wMaxZ <= wMinZ) wMaxZ = wMinZ + 1f;
+        }
+        else { wMinX = dMinX; wMaxX = dMaxX; wMinZ = dMinZ; wMaxZ = dMaxZ; }
+
+        float spanX = Mathf.Max(1f, wMaxX - wMinX), spanZ = Mathf.Max(1f, wMaxZ - wMinZ);
+        int boardT = Theme.ScaledWidth(360);
+        float scale = boardT / Mathf.Max(spanX, spanZ);
+        int boardW = Mathf.Clamp(Mathf.CeilToInt(spanX * scale), 40, Theme.ScaledWidth(520));
+        int boardH = Mathf.Clamp(Mathf.CeilToInt(spanZ * scale), 40, Theme.ScaledWidth(520));
+        int dot = Mathf.Clamp(Theme.ScaledWidth(7), 5, 12);
+
+        var board = UIFactory.CreateUIObject("FaustPosBoard", parent);
+        var bg = board.AddComponent<UnityEngine.UI.Image>();
+        bg.color = new Color(0f, 0f, 0f, 0.45f); bg.raycastTarget = false;
+        bool fitSquare = mapMode && FaustMapBackdrop.HasImage;
+        if (fitSquare)
+        {
+            int sq = boardT;
+            UIFactory.SetLayoutElement(board, minWidth: sq, preferredWidth: sq, flexibleWidth: 0, minHeight: sq, preferredHeight: sq, flexibleHeight: 0);
+            FillMapBoardToWidth(board, parent);
+        }
+        else
+            UIFactory.SetLayoutElement(board, minWidth: boardW, preferredWidth: boardW, flexibleWidth: 0, minHeight: boardH, preferredHeight: boardH, flexibleHeight: 0);
+
+        if (mapMode) FaustMapBackdrop.Decorate(board, boardW, boardH, wMinX, wMaxX, wMinZ, wMaxZ);
+
+        int offMap = 0, plotted = 0;
+        foreach (var p in players)
+        {
+            float nx = (p.X - wMinX) / spanX, nz = (p.Z - wMinZ) / spanZ;
+            if (mapMode && (nx < 0f || nx > 1f || nz < 0f || nz > 1f)) { offMap++; continue; }
+            plotted++;
+            string nm = string.IsNullOrEmpty(p.Name) ? p.Steam.ToString() : p.Name;
+
+            var d = UIFactory.CreateUIObject("pp", board);
+            var img = d.AddComponent<UnityEngine.UI.Image>();
+            img.color = new Color(0.32f, 0.92f, 1f, 1f);   // bright cyan-white — distinct from heat ramps + map art
+            img.raycastTarget = true;
+            var rt = d.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(nx, nz); rt.anchorMax = new Vector2(nx, nz); rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(dot, dot); rt.anchoredPosition = Vector2.zero;
+            string terr = p.Tindex < 0 ? "open world" : $"territory {p.Tindex}";
+            TooltipHover.Attach(d, $"{nm} · ({p.X:0}, {p.Z:0}) · {FaustRegionCell(p.Region)} · {terr}");
+
+            if (_faustPosShowLabels)
+            {
+                var lblGo = UIFactory.CreateLabel(board, "ppL", nm, TextAlignmentOptions.MidlineLeft, color: null, fontSize: Theme.ScaledUI(10));
+                lblGo.TextMesh.color = new Color(0.95f, 0.98f, 1f, 0.95f);
+                lblGo.TextMesh.enableWordWrapping = false; lblGo.TextMesh.overflowMode = TextOverflowModes.Overflow;
+                lblGo.TextMesh.fontStyle = FontStyles.Bold;
+                lblGo.TextMesh.raycastTarget = false;
+                var lrt = lblGo.GameObject.GetComponent<RectTransform>();
+                // Anchor the label at the dot, pivot to the left and nudge right so it reads off the dot.
+                lrt.anchorMin = new Vector2(nx, nz); lrt.anchorMax = new Vector2(nx, nz); lrt.pivot = new Vector2(0f, 0.5f);
+                lrt.sizeDelta = new Vector2(Theme.ScaledWidth(120), Theme.ScaledHeight(14));
+                lrt.anchoredPosition = new Vector2(dot * 0.7f, 0f);
+            }
+        }
+
+        string frame = mapMode
+            ? (FaustMapBackdrop.HasImage ? "map image + grid" : "coordinate grid") + $" · world X[{wMinX:0}..{wMaxX:0}] Z[{wMinZ:0}..{wMaxZ:0}]"
+            : "zoomed to data";
+        string offNote = offMap > 0 ? $" · <color=#FFB070>{offMap} off-map</color>" : "";
+        AddFaustListLine(parent, "PmCap",
+            $"<color={Theme.MutedBodyHex}>{plotted} online player(s){offNote} · {frame} · +X→right, +Z→up (north) · " +
+            "<color=#52E8FF>●</color> player · hover (or read the label) for name & coords</color>", Theme.ScaledUI(10));
+    }
+
+    private static Color FaustBloodDotColor(int q)
+    {
+        if (q >= 80) return new Color(1.0f, 0.84f, 0.35f, 0.98f);   // gold
+        if (q >= 50) return new Color(0.88f, 0.69f, 0.38f, 0.95f);  // amber
+        return new Color(0.78f, 0.5f, 0.5f, 0.95f);                 // dim red
     }
 
     // ============================ HELP: QUICK START + REFERENCE ============================
@@ -3807,7 +5747,9 @@ public partial class MainPanel
             $"{Mono(".faust api positions")} — online player coordinates (admin-default)\n" +
             $"{Mono(".faust api resources <here|nearest|index>")} — enemy castle container totals (admin-default)\n" +
             $"{Mono(".faust api stats <playtime|concurrency>")} — leaderboard / population over time\n" +
-            $"{Mono(".faust api stats <hours|daily|newplayers|sessions>")} — activity analytics charts");
+            $"{Mono(".faust api stats <hours|daily|newplayers|sessions>")} — activity analytics charts\n" +
+            $"{Mono(".faust api bosses")} / {Mono("boss <name|guid>")} — V Blood status board (live/defeated, admin-default)\n" +
+            $"{Mono(".faust api kills")} / {Mono("bosskills [days]")} — kill + boss-defeat leaderboards (admin-default)");
         AddSpacer(page, 6);
         var a = AddCard(page, "FaustHelpAdmin");
         AddSectionHeading(a, "Admin commands (server-side)");
@@ -3817,9 +5759,11 @@ public partial class MainPanel
             $"{Mono(".faust admin status [feature]")}\n" +
             $"{Mono(".faust admin grant/revoke <player> <feature>")}\n" +
             $"{Mono(".faust admin unlocks <player>")}\n" +
+            $"{Mono(".faust admin set/get/resetcfg <feature> [setting] [value]")} — live config editor (Faust 0.16+)\n" +
+            $"{Mono(".faust admin setglobal/getglobal <setting> [value]")} — global settings (Faust 0.16+)\n" +
             $"{Mono(".faust admin data status")}\n" +
             $"{Mono(".faust admin data clear <days>")}\n" +
-            $"{Mono(".faust admin data wipe <activity|unlocks|usage|all> [confirm]")}");
+            $"{Mono(".faust admin data wipe <activity|unlocks|usage|heatmap|kills|all> [confirm]")}");
     }
 
     // ============================ IN-RAIL DIAGNOSTIC ============================

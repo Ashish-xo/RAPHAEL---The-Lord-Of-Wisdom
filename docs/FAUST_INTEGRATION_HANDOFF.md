@@ -75,6 +75,14 @@
 | `stats <playtime\|concurrency> [page]` | `[FAUST:stat]` + `[FAUST:end]` | `Playtime` / `Concurrency` | **Server Stats** ✅ (+ sparkline graph) |
 | `positions [page]` | `[FAUST:pos]` (+`region=` api 8) + `[FAUST:end]` | `FaustState.Positions` | **Player Positions** ✅ (sortable, Region col) |
 | `resources <target> [page]` | `[FAUST:res]` + `[FAUST:item]` + `[FAUST:end]` | `ResourcesHeader` / `ResourceItems` | **Castle Resources** ✅ |
+| `access` gate tokens (api 18, §15a) | `cd`/`window`/`period`/`maxuses`/`nearprefab`/`neardist` on `[FAUST:access]` | `FaustAccessRow.Cd/Window/Period/MaxUses/NearPrefab/NearDist` | **Admin: Oversight** (Gates column) ✅ |
+| `bosses [page]` (api 18, §B1) | `[FAUST:boss]` rows + `[FAUST:end] cmd=bosses` | `FaustState.Bosses` | **Boss Status** tab ✅ |
+| `boss <name\|guid>` (api 18, §B1) | one `[FAUST:boss]` (no end trailer, commit-now) | `FaustState.BossLookup` | **Boss Status → Look up one boss** ✅ |
+| `kills [days] [page]` (api 18, §B2) | `[FAUST:kill]` rows + `[FAUST:end] cmd=kills` | `FaustState.Kills` | **Leaderboards → Top killers** ✅ |
+| `bosskills [days] [page]` (api 18, §B2) | `[FAUST:bosskill]` rows + `[FAUST:end] cmd=bosskills` | `FaustState.BossKills` | **Leaderboards → Most-defeated V Bloods** ✅ |
+| `worldscan <spec> [page]` (api 18, §C1) | `[FAUST:asset]` rows (incl. `unittype`/`restier`) + opt `[FAUST:note] truncated=1` + `[FAUST:end] cmd=worldscan` | `FaustState.WorldAssets` (`FaustAsset.UnitType/ResTier`) | **World Map** tab (type/id/bloodtype/bloodqmin/**unittype** filters + table w/ category·tier + X/Z dot map) ✅ |
+| `admin prefab <id\|name> [page]` (api 18, §7, chat not wire) | plain `<guid> <name>` rows | — (chat reply) | **World Map → Prefab lookup & diagnostics** (Find prefab) ✅ |
+| `admin worldscandiag <fragment>` (api 18, §C1, chat not wire) | plain category/verdict dump | — (chat reply) | **World Map → Prefab lookup & diagnostics** (Audit scan) ✅ |
 
 All lists render as columnar tables (`AddFaustHeaderRow`/`AddFaustCellRow`); single-record results use
 `AddStatRow` label/value rows. Paging is 1-based; Raphael reads `page=cur/total` + `count=` off
@@ -96,9 +104,13 @@ status/clear/wipe` commands are **server-side chat commands** (not wire). `Faust
 `BeginAdminGate`-wrapped (greyed/disabled for non-admins; the server still enforces): **Admin: Control**
 (feature cycler + block/unblock with auto-reopen minutes + daily schedule set/clear + status + a
 **Data management** card: data status, prune-older-than-days, and a preview-then-confirm wipe of
-`activity|unlocks|usage|all`) and **Admin: Access** (player + feature cycler + grant/revoke + unlocks).
-The data commands have **no handshake feature key and no ApiVersion bump** (stay 10) — surfaced as
-"Faust 0.11+".
+`activity|unlocks|usage|heatmap|kills|all`) and **Admin: Access** (player + feature cycler + grant/revoke
++ unlocks). The data commands have **no handshake feature key and no ApiVersion bump** — surfaced as
+"Faust 0.11+". Admin: Control also hosts the **Live config editor** (§3b / §15b, Faust 0.16+): per-feature
++ global cyclers + a value input sending `.faust admin set/get/resetcfg` / `setglobal`/`getglobal`, so an
+admin can change cost / cooldown / usage-limit / proximity / access / availability / unlock at runtime
+(reply read from chat). The `.faust admin data status` 512-byte truncation bug is fixed server-side in
+Faust 0.16.0.
 
 **Region sentinel (0.10.0+):** every region-bearing line (`positions`, `castleinfo`, `castles`, `decay`,
 `plots`) emits `region=-` for open-world / out-of-bounds / unmapped (no more literal `None`/`Unknown`).

@@ -43,7 +43,8 @@ internal static class FaustProtocolService
     private enum Scope { None, Castle, Player, Plots, AllPlots, Positions, Resources, Stats,
         DecayWatch, Hours, Daily, NewPlayers, Sessions, PlayerHours, PlayerSessions,
         Weekdays, PlayerWeekdays, Pdaily, Population, Recency, Peak, Regions, Clans, Players,
-        ClanMembers, Access, Usage, NewRoster, Timeline, ActiveGrid, RegionDaily, Heatmap }
+        ClanMembers, Access, Usage, NewRoster, Timeline, ActiveGrid, RegionDaily, Heatmap,
+        Bosses, BossLookup, Kills, BossKills, WorldScan }
     private static Scope _active = Scope.None;
     private static float _activeStartedAt;       // realtime of the last query request (per-page re-anchored)
     private const float QUERY_TIMEOUT_SECONDS = 7f;
@@ -82,14 +83,30 @@ internal static class FaustProtocolService
     private static int _regionDailyDays = 30;
     private static readonly List<FaustRegionDay>        _accRegionDaily = new();
     private static string _heatTarget = "";
+    private static int _heatDays;            // heat-map time window (api 19): 0 = all-time, N = last N UTC days
     private static FaustHeatHeader                      _heatHeader;
     private static readonly List<FaustHeatCell>         _accHeatCells = new();
+    // §B1/§B2 (api 18) — boss board + kill leaderboards
+    private static readonly List<FaustBoss>             _accBosses = new();
+    private static int _killsDays;
+    private static readonly List<FaustKillRow>          _accKills = new();
+    private static int _bossKillsDays;
+    private static readonly List<FaustBossKillRow>      _accBossKills = new();
+    // §C1 worldscan
+    private static string _worldScanSpec = "all";
+    private static bool _worldScanTruncated;
+    private static readonly List<FaustAsset>            _accAssets = new();
+    // Client-side safety cap on accumulated worldscan rows (Faust 0.16.1 allows up to 10000 / unlimited). Stops
+    // an unbounded scan from paging hundreds of times and rendering tens of thousands of dots; surfaced as
+    // "truncated — narrow the filter." Generous headroom over Faust's old 2000 cap.
+    private const int WORLDSCAN_ROW_CAP = 5000;
 
     // The known feature keys advertised in [FAUST:version] (contract §2).
     private static readonly string[] FeatureKeys =
     {
         "playerpositions", "castleinfo", "playerinfo", "plotavailability",
-        "[redacted]", "castleresources", "stats", "allcastles", "decaywatch", "clans", "heatmap",
+        "castleresources", "stats", "allcastles", "decaywatch", "clans", "heatmap",
+        "bosses", "kills", "worldscan",
     };
 
     // ---- per-frame driver (registered on CoreUpdateBehavior.Actions in Plugin.Load) ----
@@ -163,6 +180,8 @@ internal static class FaustProtocolService
         _accAccess.Clear(); _accUsage.Clear();
         _accNewRoster.Clear(); _accTimeline.Clear(); _accActiveGrid.Clear();
         _accRegionDaily.Clear(); _heatHeader = null; _accHeatCells.Clear();
+        _accBosses.Clear(); _accKills.Clear(); _accBossKills.Clear();
+        _accAssets.Clear(); _worldScanTruncated = false;
     }
 
     // ======================= public query API (called by the Faust UI tabs) =======================
@@ -422,14 +441,77 @@ internal static class FaustProtocolService
     }
 
     // heat map (api 16): target "" / "all" = server-wide, else a name/steamId.
-    public static void QueryHeatmap(string target)
+    public static void QueryHeatmap(string target, int days = 0)
     {
         if (!FaustState.Present || !GateOk(Scope.Heatmap)) return;
         _accHeatCells.Clear(); _heatHeader = null;
         _heatTarget = string.IsNullOrWhiteSpace(target) ? "" : target.Trim();
+        _heatDays = days < 0 ? 0 : days;
         BeginQuery(Scope.Heatmap);
         FaustState.SetHeatmap(FaustQueryStatus.Loading, _heatTarget.Length == 0 ? "server" : _heatTarget, null, Array.Empty<FaustHeatCell>(), 0);
-        FaustClient.RequestHeatmap(_heatTarget, 1);
+        FaustClient.RequestHeatmap(_heatTarget, _heatDays, 1);
+    }
+
+    // ---- §B1 boss board (api 18) ----
+    public static void QueryBosses()
+    {
+        if (!FaustState.Present || !GateOk(Scope.Bosses)) return;
+        _accBosses.Clear();
+        BeginQuery(Scope.Bosses);
+        FaustState.SetBosses(FaustQueryStatus.Loading, Array.Empty<FaustBoss>(), 0);
+        FaustClient.RequestBosses(1);
+    }
+
+    // Single-boss lookup — one [FAUST:boss], no end trailer (commits immediately, like castleinfo).
+    public static void QueryBoss(string nameOrGuid)
+    {
+        if (!FaustState.Present || string.IsNullOrWhiteSpace(nameOrGuid) || !GateOk(Scope.BossLookup)) return;
+        _trackedRefreshPending = 0;   // a user lookup takes priority — its reply SHOULD show in the result card
+        BeginQuery(Scope.BossLookup);
+        FaustState.SetBossLookup(FaustQueryStatus.Loading, null, nameOrGuid);
+        FaustClient.RequestBoss(nameOrGuid);
+    }
+
+    // Periodic boss-board refresh for the boss-tracker overlay. Unlike QueryBosses it SKIPS the per-scope
+    // anti-spam cooldown (it's an intentional timed refresh, not a click) — but still respects the
+    // one-query-at-a-time rule, and deliberately does NOT flip the slot to Loading so the overlay keeps
+    // showing the current board until the refreshed rows commit (no per-cycle flicker).
+    public static void AutoQueryBosses()
+    {
+        if (!FaustState.Present || !FaustState.SupportsBosses || _active != Scope.None) return;
+        _accBosses.Clear();
+        BeginQuery(Scope.Bosses);
+        FaustClient.RequestBosses(1);
+    }
+
+    // ---- §B2 kill leaderboards (api 18) ----
+    public static void QueryKills(int days = 0)
+    {
+        if (!FaustState.Present || !GateOk(Scope.Kills)) return;
+        _accKills.Clear(); _killsDays = days;
+        BeginQuery(Scope.Kills);
+        FaustState.SetKills(FaustQueryStatus.Loading, Array.Empty<FaustKillRow>(), days, 0);
+        FaustClient.RequestKills(days, 1);
+    }
+
+    public static void QueryBossKills(int days = 0)
+    {
+        if (!FaustState.Present || !GateOk(Scope.BossKills)) return;
+        _accBossKills.Clear(); _bossKillsDays = days;
+        BeginQuery(Scope.BossKills);
+        FaustState.SetBossKills(FaustQueryStatus.Loading, Array.Empty<FaustBossKillRow>(), days, 0);
+        FaustClient.RequestBossKills(days, 1);
+    }
+
+    // ---- §C1 world-asset map (api 18) ----
+    public static void QueryWorldScan(string spec)
+    {
+        if (!FaustState.Present || !GateOk(Scope.WorldScan)) return;
+        _accAssets.Clear(); _worldScanTruncated = false;
+        _worldScanSpec = string.IsNullOrWhiteSpace(spec) ? "all" : spec.Trim();
+        BeginQuery(Scope.WorldScan);
+        FaustState.SetWorldScan(FaustQueryStatus.Loading, _worldScanSpec, Array.Empty<FaustAsset>(), 0, false);
+        FaustClient.RequestWorldScan(_worldScanSpec, 1);
     }
 
     private static void BeginQuery(Scope scope)
@@ -514,7 +596,10 @@ internal static class FaustProtocolService
             // §8 batch (api 13): prisoner rows ride the resources reply; clanmember/access/usagerow are their own paged lists.
             case "prisoner":    if (_active == Scope.Resources) _accPrisoners.Add(new FaustPrisoner(line.GetText("name"), line.GetClean("bloodtype"), line.GetInt("bloodquality", -1))); break;
             case "clanmember":  if (_active == Scope.ClanMembers) _accClanMembers.Add(new FaustClanMember(line.GetText("name"), line.GetBool("online"), line.GetClean("role"))); break;
-            case "access":      if (_active == Scope.Access) { var (cg, cq) = ParseCost(line.Get("cost")); _accAccess.Add(new FaustAccessRow(line.Get("feature"), line.GetClean("scope"), cg, cq, line.GetInt("granted", -1), line.GetInt("unlocked", -1))); } break;
+            case "access":      if (_active == Scope.Access) { var (cg, cq) = ParseCost(line.Get("cost")); _accAccess.Add(new FaustAccessRow(
+                                    line.Get("feature"), line.GetClean("scope"), cg, cq, line.GetInt("granted", -1), line.GetInt("unlocked", -1),
+                                    // §15a non-cost gate tokens (api 18) — bare numbers, 0 = unset; omitted by older Faust.
+                                    line.GetInt("cd"), line.GetInt("window"), line.GetInt("period"), line.GetInt("maxuses"), line.GetInt("nearprefab"), line.GetFloat("neardist"))); } break;
             case "usagerow":    if (_active == Scope.Usage) _accUsage.Add(new FaustUsageRow(line.Get("feature"), line.GetInt("uses"), line.GetInt("payers"), line.GetInt("itemspent"), line.GetInt("item"), line.GetInt("cooldownhits"))); break;
 
             // §9 drill-downs (api 14): hoursplayers rides the stats-hours reply (single line); nprow/stl/agrow are paged lists.
@@ -527,6 +612,16 @@ internal static class FaustProtocolService
             case "rdrow":       if (_active == Scope.RegionDaily) _accRegionDaily.Add(new FaustRegionDay(line.GetLong("day"), CleanRegion(line.Get("region")), line.GetInt("castles"), line.GetInt("plots"), line.GetInt("players"))); break;
             case "hmhead":      OnHeatHead(line); break;
             case "hmrow":       if (_active == Scope.Heatmap) ParseHeatRow(line.Get("data")); break;
+
+            // §B1/§B2 (api 18): boss rows serve the paged board AND the single lookup (disambiguated by scope —
+            // the single lookup commits immediately, no end trailer); kill/bosskill are paged leaderboard rows.
+            case "boss":        if (_active == Scope.Bosses) _accBosses.Add(ReadBoss(line)); else OnBoss(line); break;
+            case "kill":        if (_active == Scope.Kills) _accKills.Add(new FaustKillRow(line.GetInt("rank"), line.GetLong("steam"), line.GetText("name"), line.GetInt("kills"), line.GetInt("pvp"))); break;
+            case "bosskill":    if (_active == Scope.BossKills) _accBossKills.Add(new FaustBossKillRow(line.GetInt("rank"), line.GetInt("guid"), line.GetText("name"), line.GetInt("count"))); break;
+
+            // §C1 worldscan (api 18): asset rows + an optional [FAUST:note] truncated=1 before the end trailer.
+            case "asset":       if (_active == Scope.WorldScan) _accAssets.Add(ReadAsset(line)); break;
+            case "note":        if (_active == Scope.WorldScan && line.GetBool("truncated")) _worldScanTruncated = true; break;
 
             case "end":     OnEnd(line); break;
             case "err":     OnErr(line); break;
@@ -612,6 +707,51 @@ internal static class FaustProtocolService
         if (_active == Scope.Castle) { _active = Scope.None; _activeStartedAt = 0f; }
     }
 
+    // §B1: a [FAUST:boss] row. `status=down` omits the live fields (x/z/region/hp/hpmax/hppct/level) → NaN/-1.
+    private static FaustBoss ReadBoss(FaustLine line) => new(
+        line.GetInt("guid"), line.GetText("name"), line.GetClean("status"), line.GetBool("defeated"),
+        line.Has("x") ? line.GetFloat("x") : float.NaN, line.Has("z") ? line.GetFloat("z") : float.NaN,
+        CleanRegion(line.Get("region")),
+        line.GetFloat("hp", -1f), line.GetFloat("hpmax", -1f), line.GetInt("hppct", -1), line.GetInt("level", -1));
+
+    // §B1 single-boss lookup commits immediately (no [FAUST:end] trailer), like castleinfo. Also caches the boss
+    // by guid for the tracker overlay's per-boss auto-refresh.
+    private static void OnBoss(FaustLine line)
+    {
+        var boss = ReadBoss(line);
+        FaustState.SetTrackedBoss(boss);
+        // Tracker auto-refresh replies (RefreshTrackedBosses) update ONLY the cache — they must NOT overwrite the
+        // "Look up one boss" result card (that would leave a tracked boss stuck there with no way to clear it,
+        // #5 follow-up). Only user-initiated lookups (pending==0) populate the visible result.
+        if (_trackedRefreshPending > 0) _trackedRefreshPending--;
+        else FaustState.SetBossLookup(FaustQueryStatus.Ready, boss, FaustState.BossLookupQuery);
+        if (_active == Scope.BossLookup) { _active = Scope.None; _activeStartedAt = 0f; }
+    }
+
+    // Per-boss refresh for the boss-tracker overlay: fire a single-boss lookup (`.faust api boss <guid|name>`) for
+    // each tracked boss instead of re-pulling the whole board. Replies route through OnBoss → the tracked-boss
+    // cache. Sent raw (no BeginQuery) so several can go out together; skipped while another query is mid-flight.
+    // Count of in-flight tracker-refresh boss replies still expected; OnBoss routes these to the cache only.
+    private static int _trackedRefreshPending;
+    public static void RefreshTrackedBosses(System.Collections.Generic.IReadOnlyList<string> guidsOrNames)
+    {
+        if (!FaustState.Present || !FaustState.SupportsBosses || _active != Scope.None || guidsOrNames == null) return;
+        int sent = 0;
+        foreach (var q in guidsOrNames)
+            if (!string.IsNullOrWhiteSpace(q)) { FaustClient.RequestBoss(q); sent++; }
+        _trackedRefreshPending = sent;
+    }
+
+    // §C1: a [FAUST:asset] row. Unit rows carry hp/hpmax (omitted if no Health) + bloodtype/bloodq; node rows
+    // carry only guid/name/x/z/region.
+    private static FaustAsset ReadAsset(FaustLine line) => new(
+        line.GetInt("guid"), line.GetText("name"), line.GetClean("kind") == "unit",
+        line.Has("x") ? line.GetFloat("x") : float.NaN, line.Has("z") ? line.GetFloat("z") : float.NaN,
+        CleanRegion(line.Get("region")),
+        line.GetFloat("hp", -1f), line.GetFloat("hpmax", -1f),
+        line.GetClean("bloodtype"), line.GetInt("bloodq", -1),
+        line.GetInt("unittype", -1), line.GetInt("restier", -1));
+
     private static void OnPlayer(FaustLine line)
     {
         var player = new FaustPlayer(
@@ -696,7 +836,8 @@ internal static class FaustProtocolService
         if (hasMap) ParseQuad(line.Get("mapbounds"), out mMinCx, out mMinCz, out mMaxCx, out mMaxCz);
         _heatHeader = new FaustHeatHeader(line.Get("scope"), line.GetFloat("cell"), line.GetInt("samples"),
             line.GetInt("cells"), minCx, minCz, maxCx, maxCz, line.GetBool("collecting"),
-            hasMap, mMinCx, mMinCz, mMaxCx, mMaxCz);
+            hasMap, mMinCx, mMinCz, mMaxCx, mMaxCz,
+            line.GetInt("days", 0), line.Has("retentiondays") ? line.GetInt("retentiondays", -1) : -1);
     }
 
     // `[FAUST:hmrow] data=cx:cz:count,cx:cz:count,…` — packed cells, split on ',' then ':'.
@@ -987,7 +1128,7 @@ internal static class FaustProtocolService
                 break;
             case "heatmap":
                 if (_active != Scope.Heatmap) break;
-                if (page < pages) { _activeStartedAt = Time.realtimeSinceStartup; FaustClient.RequestHeatmap(_heatTarget, page + 1); }
+                if (page < pages) { _activeStartedAt = Time.realtimeSinceStartup; FaustClient.RequestHeatmap(_heatTarget, _heatDays, page + 1); }
                 else
                 {
                     var cells = _accHeatCells.ToArray(); _accHeatCells.Clear();
@@ -995,6 +1136,52 @@ internal static class FaustProtocolService
                     string scope = _heatTarget.Length == 0 ? "server" : _heatTarget;
                     // header present (even with 0 cells) = Ready, so the UI can show the "collecting/off" state.
                     FaustState.SetHeatmap(hdr == null ? FaustQueryStatus.Empty : FaustQueryStatus.Ready, scope, hdr, cells, count);
+                    _active = Scope.None; _activeStartedAt = 0f;
+                }
+                break;
+            case "bosses":
+                if (_active != Scope.Bosses) break;
+                if (page < pages) { _activeStartedAt = Time.realtimeSinceStartup; FaustClient.RequestBosses(page + 1); }
+                else
+                {
+                    var rows = _accBosses.ToArray(); _accBosses.Clear();
+                    FaustState.SetBosses(rows.Length == 0 ? FaustQueryStatus.Empty : FaustQueryStatus.Ready, rows, count);
+                    _active = Scope.None; _activeStartedAt = 0f;
+                }
+                break;
+            case "kills":
+                if (_active != Scope.Kills) break;
+                if (page < pages) { _activeStartedAt = Time.realtimeSinceStartup; FaustClient.RequestKills(_killsDays, page + 1); }
+                else
+                {
+                    var rows = _accKills.ToArray(); _accKills.Clear();
+                    FaustState.SetKills(rows.Length == 0 ? FaustQueryStatus.Empty : FaustQueryStatus.Ready, rows, _killsDays, count);
+                    _active = Scope.None; _activeStartedAt = 0f;
+                }
+                break;
+            case "bosskills":
+                if (_active != Scope.BossKills) break;
+                if (page < pages) { _activeStartedAt = Time.realtimeSinceStartup; FaustClient.RequestBossKills(_bossKillsDays, page + 1); }
+                else
+                {
+                    var rows = _accBossKills.ToArray(); _accBossKills.Clear();
+                    FaustState.SetBossKills(rows.Length == 0 ? FaustQueryStatus.Empty : FaustQueryStatus.Ready, rows, _bossKillsDays, count);
+                    _active = Scope.None; _activeStartedAt = 0f;
+                }
+                break;
+            case "worldscan":
+                if (_active != Scope.WorldScan) break;
+                // Faust 0.16.1 raised its result cap to 10000 / unlimited. Keep chasing pages until done, but
+                // stop at a client-side safety cap so an unlimited, unfiltered scan can't page hundreds of times
+                // and render tens of thousands of dots. Hitting the cap is surfaced like the server's truncation.
+                if (page < pages && _accAssets.Count < WORLDSCAN_ROW_CAP)
+                { _activeStartedAt = Time.realtimeSinceStartup; FaustClient.RequestWorldScan(_worldScanSpec, page + 1); }
+                else
+                {
+                    bool cappedEarly = page < pages;   // stopped before the last page due to the row cap
+                    var rows = _accAssets.ToArray(); _accAssets.Clear();
+                    bool trunc = _worldScanTruncated || cappedEarly; _worldScanTruncated = false;
+                    FaustState.SetWorldScan(rows.Length == 0 ? FaustQueryStatus.Empty : FaustQueryStatus.Ready, _worldScanSpec, rows, count, trunc);
                     _active = Scope.None; _activeStartedAt = 0f;
                 }
                 break;
@@ -1061,6 +1248,11 @@ internal static class FaustProtocolService
             case Scope.ActiveGrid:     FaustState.SetActiveGrid(FaustQueryStatus.Error, Array.Empty<FaustActiveRow>(), 0, message); break;
             case Scope.RegionDaily:    FaustState.SetRegionDaily(FaustQueryStatus.Error, Array.Empty<FaustRegionDay>(), 0, message); break;
             case Scope.Heatmap:        FaustState.SetHeatmap(FaustQueryStatus.Error, _heatTarget.Length == 0 ? "server" : _heatTarget, null, Array.Empty<FaustHeatCell>(), 0, message); break;
+            case Scope.Bosses:         FaustState.SetBosses(FaustQueryStatus.Error, Array.Empty<FaustBoss>(), 0, message); break;
+            case Scope.BossLookup:     FaustState.SetBossLookup(FaustQueryStatus.Error, null, FaustState.BossLookupQuery, message); break;
+            case Scope.Kills:          FaustState.SetKills(FaustQueryStatus.Error, Array.Empty<FaustKillRow>(), _killsDays, 0, message); break;
+            case Scope.BossKills:      FaustState.SetBossKills(FaustQueryStatus.Error, Array.Empty<FaustBossKillRow>(), _bossKillsDays, 0, message); break;
+            case Scope.WorldScan:      FaustState.SetWorldScan(FaustQueryStatus.Error, _worldScanSpec, Array.Empty<FaustAsset>(), 0, false, message); break;
         }
         if (scope != Scope.None) { _active = Scope.None; _activeStartedAt = 0f; }
     }
@@ -1142,6 +1334,11 @@ internal static class FaustProtocolService
             case "decaywatch":
             case "decay":            return Scope.DecayWatch;
             case "clans":            return Scope.Clans;
+            case "bosses":           return Scope.Bosses;
+            case "boss":             return Scope.BossLookup;
+            case "kills":            return Scope.Kills;
+            case "bosskills":        return Scope.BossKills;
+            case "worldscan":        return Scope.WorldScan;
             default:                 return Scope.None;
         }
     }

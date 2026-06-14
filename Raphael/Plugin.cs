@@ -199,6 +199,10 @@ public class Plugin : BasePlugin
         // after a few silent probes. Mirrors the Uriel tick above.
         CoreUpdateBehavior.Actions.Add(Services.Faust.FaustProtocolService.Tick);
 
+        // 0.54: boss-tracker overlay auto-refresh (opt-in, ~5s). No-op unless the overlay is open and the
+        // FaustBossTrackerAutoRefresh setting is on; self-throttles + respects Faust presence/support.
+        CoreUpdateBehavior.Actions.Add(UI.ModContent.FaustBossTrackerOverlayPanel.AutoRefreshTick);
+
         // 0.17.2: selective patch manifest (was CreateAndPatchAll over the whole
         // assembly). Lets an affected player drop individual patch GROUPS via the
         // Compatibility config section to bisect the intermittent 0.16.x load crash.

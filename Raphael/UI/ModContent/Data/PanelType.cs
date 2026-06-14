@@ -90,6 +90,9 @@ public enum PanelType
     FaustClansTab,          // admin: clan composition (clanned vs solo split + per-clan rosters) — needs `.faust api clans` (api 11)
     FaustPositionsTab,      // admin: online player coordinates (sortable list) — Phase 2
     FaustStatsTab,          // player: playtime leaderboard + concurrency series
+    FaustBossesTab,         // admin: V Blood boss status board (live/defeated) — needs `.faust api bosses` (api 18, §B1)
+    FaustKillsTab,          // admin: kill + boss-defeat leaderboards — needs `.faust api kills`/`bosskills` (api 18, §B2)
+    FaustWorldScanTab,      // admin: filterable map of in-world units + resource nodes — needs `.faust api worldscan` (api 18, §C1)
     FaustSettingsTab,       // client-side Faust settings: diagnostics, availability readout
     FaustAdminControlTab,   // admin: block/unblock/schedule/status — Phase 2
     FaustAdminAccessTab,    // admin: grant/revoke/unlocks — Phase 2
@@ -102,6 +105,7 @@ public enum PanelType
     FamiliarOverlay,
     FamiliarBrowserOverlay,
     FamiliarQuickSpawnOverlay,  // 0.52: up-to-5 user-assigned familiars, one-click summon by name (.fam sb)
+    FaustBossTrackerOverlay,    // 0.54: up-to-3 tracked V Blood statuses (reads Faust boss board), optional ~5s auto-refresh
     ProfessionOverlay,
     ShiftSpellOverlay,      // 0.11.0: visual cooldown ring/bar for the shift slot (Eclipse-style)
     CombinedOverlay,        // 0.14.0: single combined info overlay (XP + Familiar + Wep + Blood + Prof + Quests)

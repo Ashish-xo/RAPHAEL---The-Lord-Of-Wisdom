@@ -83,22 +83,18 @@ $readme     = Join-Path $repoRoot 'README.md'
 $license    = Join-Path $repoRoot 'LICENSE.txt'
 $changelog  = Join-Path $repoRoot 'CHANGELOG.md'
 
-# Thunderstore caps the bundled CHANGELOG.md at 100,000 characters
-# and rejects the upload otherwise. The full project changelog (every
-# version with full friend-test context) lives at the repo root for
-# GitHub; CHANGELOG.thunderstore.md is the abbreviated variant we
-# bundle into the zip when present. The full one stays the canonical
-# source — the abbreviated changelog's header links back to it.
+# The Thunderstore page shows the bundled CHANGELOG.md, so we bundle the
+# concise, reader-friendly CHANGELOG.thunderstore.md there (milestone highlights
+# with collapsed deep history). The full per-patch CHANGELOG.md stays at the repo
+# root as the canonical archive on GitHub — both the README and the abbreviated
+# changelog's header link to it. (Thunderstore also rejects a CHANGELOG over
+# 100,000 chars, which the abbreviated one comfortably avoids.)
 $thunderstoreChangelog = Join-Path $repoRoot 'CHANGELOG.thunderstore.md'
-# Only fall back to the abbreviated CHANGELOG.thunderstore.md if the canonical
-# CHANGELOG.md is actually too big (>95k, near Thunderstore's 100k cap). Since
-# the changelog was compressed to a milestone history it now fits, so the full
-# CHANGELOG.md is bundled directly.
-$changelogForZip = if ((Get-Item $changelog).Length -gt 95000 -and (Test-Path $thunderstoreChangelog)) {
-    Write-Host "Bundling CHANGELOG.thunderstore.md (full CHANGELOG.md exceeds Thunderstore's 100k limit)." -ForegroundColor Yellow
+$changelogForZip = if (Test-Path $thunderstoreChangelog) {
+    Write-Host ("Bundling CHANGELOG.thunderstore.md ({0:N1} KB) for the store page." -f ((Get-Item $thunderstoreChangelog).Length/1KB)) -ForegroundColor DarkGray
     $thunderstoreChangelog
 } else {
-    Write-Host ("Bundling CHANGELOG.md ({0:N1} KB)." -f ((Get-Item $changelog).Length/1KB)) -ForegroundColor DarkGray
+    Write-Host ("CHANGELOG.thunderstore.md missing — bundling full CHANGELOG.md ({0:N1} KB)." -f ((Get-Item $changelog).Length/1KB)) -ForegroundColor Yellow
     $changelog
 }
 

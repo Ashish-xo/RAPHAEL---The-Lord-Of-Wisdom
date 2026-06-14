@@ -1,88 +1,122 @@
 # Changelog — Raphael, Lord of Wisdom
 
-Raphael began as **BloodCraftHub** (v0.1 → v0.30). Condensed milestone history below; full per-patch detail
-lives in [`CHANGELOG.md`](https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom/blob/main/CHANGELOG.md).
+*Player-facing highlights, newest first. Full per-patch detail lives in
+[CHANGELOG.md](https://github.com/KDavidP1987/Raphael-Lord-of-Wisdom/blob/main/CHANGELOG.md).
+Raphael was formerly **BloodCraftHub** (v0.1–v0.30).*
 
-## 0.52.0 — New: Familiar Quick Spawn overlay
-- **New: Familiar Quick Spawn overlay (Bloodcraft).** A draggable overlay with up to **5 one-click buttons**,
-  each pinned to a familiar, that summons it **by name regardless of which box it's in** (`.fam sb`). Includes
-  **Dismiss / Recall** (toggle your active familiar offline/online without unbinding) and **Unbind** (release
-  so you can summon another). Assign familiars via the new **+ QS** buttons + **Quick Spawn slots** card on the
-  **All Familiars** tab; assignments persist. Fully integrated with the overlay system (drag/resize,
-  transparency, OV hide-all, Lock overlays, login restore).
+**Current: v0.64.0** (pre-1.0 beta).
 
-## 0.51.1 — Fix: Combined overlay after "hide all"
-- **Fix:** if you use the single **Combined** info overlay, hiding all overlays with the **OV** button and
-  then un-hiding brought them back as the **individual** overlays instead of the Combined one. Un-hide now
-  correctly restores the Combined overlay. (Tester feedback.)
+---
 
-## 0.51.0 — Compliance update
-- A compliance-only release that brings Raphael into line with the V Rising modding community's guidelines.
-  No new features and no other behavior changes.
+## 0.64.0 — Live “Players now” map + redesigned heat palettes
 
-## 0.47 – 0.50 — Faust ApiVersion 17, chart & settings polish, chat scrolling
-- **Faust through ApiVersion 17** — a player-position **heat map** (cold→hot gradient, full-map scale, detail
-  control), **region fill-% over time** (per-day matrix + per-region trends), **New vs returning** as two-color
-  daily bars, a combined **New players** chart + "who joined" roster, per-player **session timeline** and
-  **active-days grid**, and **castle world coordinates** ("Loc (X,Z)") in Open Plots / All Plots / Decay Watch.
-- **Charts** — bigger in-chart / axis / caption text that scales with UI text size; left-aligned bars that
-  stretch to fill the panel; a selectable chart color theme.
-- **Custom text-size slider** — UI / overlay / chat text are now 50–400% sliders (100% = the old "Standard").
-- **Settings reorganized into titled cards** — the Display and Game UI → chat pages are grouped instead of one
-  long wall of toggles.
-- **Chat** — clickable ↑/↓ scroll arrows + opt-in PageUp/PageDown & arrow-key scrolling (off by default); the
-  @recipient follows the active whisper conversation; a findable "hide game chat with overlays" setting.
-- **Fixes** — clan-member lookups send the correct wire-safe name; region-matrix headers no longer clip; many
-  large-text overlap fixes across the tabs.
+- **Player Positions** map gained a **View** toggle: **Heat map** ↔ **Players now (live)** — plots every online
+  player on the calibrated map with their name (and hover detail).
+- **Redesigned heat palettes** with strong cold→hot variation that reads on the map: **Magma**, **Ice→Fire**,
+  **Viridis** (cycle with **Colors**).
 
-## 0.42 – 0.46 — Faust reporting depth, Uriel admin config & tester fixes
-- **Faust through ApiVersion 12** — a **Clans** tab (clanned-vs-solo + rosters); Server-Stats **health
-  dashboards** (DAU/WAU/MAU + D1/D7/D30 retention, recency, peak concurrency, population by region); a
-  **Player roster** with active-today / active-this-week **✓** checkmarks; richer **per-player** charts
-  (weekday, daily/weekly trend, days-idle); a Server-Stats **Days-window filter**, **Refresh** button, per-chart
-  **titles + metric tooltips**, and **"Show players on map"** (admin, experimental — server-side native markers).
-- **Uriel admin config** — **Spawn conditions** (per-object / global max-per-plot, item cost,
-  permit-indestructible / respawn), **server-wide orphan purge**, and an object-spacing config reference.
-- **Quality-of-life** — a **left-rail accordion** for small screens (toggle to override); a **large-font layout
-  fix** (no more text overlapping buttons); secondary-chat **"Notes to self"** filter (+ an "exclude from All"
-  option) and the secondary chat now hides with the OV "hide all" button.
-- **Fixes** — Uriel collection progress no longer reads >100%; Faust data-reset wording clarified (only clears
-  Faust's own tracking data, never the game world/castles/players).
+## 0.63.1 — Dropdown fixes + Faust-tab cleanup
 
-## 0.31 – 0.41 — Faust integration (server investigation & analytics)
-- New **FAUST** tab group, handshake-gated like Beelzebub/Uriel, surfacing the server-side **Faust** mod:
-  **Castle Info / Open Plots / All Plots / Decay Watch / Castle Resources** (ownership, region, size, decay
-  timers, abandoned-base housekeeping, container raid-intel), **Player Info** (playtime, frequency, busiest
-  hour, days-idle), **Player Positions**, and a **Clans** tab (clanned-vs-solo split + per-clan rosters).
-- **Server Stats + reporting dashboards** — playtime leaderboard, concurrency graph, activity charts (by hour,
-  by day of week, daily/weekly trend, new players, session lengths), and server-health rollups (DAU/WAU/MAU +
-  retention, player recency, peak concurrency, population by region). Per-player versions of the activity
-  charts live in Player Info.
-- All Faust screens are ApiVersion-gated (show a "needs newer Faust" note on older servers) and queries respect
-  an anti-spam cooldown. Tracks Faust through **v0.12.0 / ApiVersion 11**.
-- Plus assorted fixes across the arc (region-sentinel handling, a map-probe crash).
+- **Online-player / castle dropdowns now populate for admins** (the auto-load was wrongly blocked); every picker
+  also got an inline **Load** button.
+- **Boss tracker** no longer leaves a tracked boss stuck under “Look up one boss”.
+- **World Map:** fixed help text overflowing; tidier filters (advanced GUID filters + map-underlay setup are now
+  collapsible, so the table sits right under the map).
+- **Player Positions:** “Show players on map” moved to the bottom + collapsed; removed the no-op **Scale** button.
+
+## 0.63.0 — Pick from dropdowns instead of typing
+
+- **Online-player dropdowns** anywhere you enter a player (Player Info, heat map, Admin → Player access).
+- **Boss lookup** and **castle index** are now dropdowns too (castles show `#index · region · (x,z) · owner`);
+  the **boss tracker overlay** now shows live **coordinates**.
+- **World Map** Category / Type are dropdowns and the Category **pre-filters the scan server-side** (units vs
+  nodes) so it pulls less.
+- **Heat map** activity dots are **brighter** on the map, plus a **Map image opacity** slider on Player Positions.
+- **Boss tracker:** removed the redundant management card — track/untrack from the board's **★** buttons.
+
+## 0.62.0 — Heat map: time windows
+
+- The player-position **heat map** now has a **When** toggle (All-time / Today / This week / This month). Needs
+  Faust 0.16.4+; older servers show the all-time map as before.
+
+## 0.61.0 — Catalog filter, map-friendly heat colors, lighter boss tracker
+
+- **World Map filter** is now driven by an **editable catalog** (`config/Raphael/worldscan_categories.txt`), so you
+  can pick a Category / Type **before** scanning, with clean NPC factions + resource types.
+- **Heat map** gained **Magenta / Cyan / White-hot** color schemes that read on top of the world-map image (opacity
+  now scales with intensity so the map shows through).
+- **Boss tracker** auto-refresh now updates **only your tracked bosses** (per-boss lookups), not the whole board.
+
+## 0.60.1 — World Map filter fixes + admin tools moved
+
+- Rebuilt the **Category / Type** filter against real resource-node names, so it now groups cleanly (Plant Fiber,
+  Copper, Pine, Stone, Gloomrot Tech…) and actually narrows the map/table.
+- Moved the world-scan **admin** tools (whitelist, prefab lookup) to **Faust → Admin: Control**.
+- “Truncated” notice now explains the **server's** result cap and how to raise it (`worldscanmaxresults`).
+
+## 0.60.0 — World Map: search & filter by category / type
+
+- **New cascading Category → Type filter** on the World Map: after a scan, narrow by category (NPC factions, or
+  resource families like Ore / Stone / Wood / Plants / Gems) and then a specific type (e.g. Ore → Copper). Built
+  automatically from the scan results — no PrefabGUIDs to type — and filters the table + map instantly.
+- *(Resource nodes only appear if whitelisted on the server — use Seed defaults.)*
+
+## 0.59.2 — Pre-calibrated map defaults
+
+- The **World Map / Heat Map** underlay now ships pre-aligned to the Vardoran map, so it's close to correct out of
+  the box (fine-tune with the calibration tool). Faust 0.16.3's boss + world-scan fixes are server-side — no
+  Raphael change.
+
+## 0.59.1 — Faust 0.16.2: bigger world scans
+
+- **World Map** scans can return far more rows (Faust raised its cap to 10000 / unlimited). Added the
+  `worldscanmaxresults` setting to the config editor + a client safety cap so huge scans stay responsive.
+- **Boss board** roaming-boss locations: no Raphael change needed (server-side fix in Faust 0.16.2).
+
+## 0.59.0 — World map fills the panel + live overlay calibration
+
+- The Faust **World Map / Heat Map** now fills the panel width, and the map image and coordinate dots are decoupled.
+- New **calibration tool** (World Map → Map underlay): move and stretch the dot overlay over the map until it lines
+  up, then **Log calibration** to print the values to the console. Adjusts the coordinate overlay only, not the map.
+
+## 0.58.6 — Readability overhaul
+
+- Rewrote this page and the README to be shorter and easier to scan, with collapsible sections. No code changes.
+
+## 0.54–0.58 — Faust 0.16: boss board, leaderboards & world map
+
+The Faust 0.16 (API 18) integration, refined across several patches. Needs **Faust 0.16+**; older Faust degrades gracefully.
+
+- **Boss Status** — a server-wide V Blood board (live location / region / HP / level, plus defeated), friendly names, single-boss lookup, and a movable **Boss Tracker overlay** (up to 3 bosses, optional ~5s refresh).
+- **Leaderboards** — top killers and most-defeated V Bloods, over today / this week / all-time.
+- **World Map** — a filterable, server-scanned map of NPC units (with blood type / quality) and resource nodes, shown as a table **and** an X/Z map you can lay over the **actual V Rising world map** (capture it from your own game, then calibrate).
+- **Live config editor** — change a feature's cost / cooldown / use-limit / proximity / access / PvP / unlock at runtime, no `.cfg` edit or restart.
+- Plus the matching fixes along the way (boss coordinates, map rendering, config-set command syntax).
+
+## 0.51–0.53 — Familiar Quick Spawn overlay + compliance
+
+- **Quick Spawn overlay** — up to 5 one-click familiar summons (by name, regardless of box) with Dismiss / Recall / Unbind; full overlay controls (opacity, text-size, transparency, lock).
+- **0.51.0** — a compliance pass aligning Raphael with the V Rising modding guidelines (no feature changes).
+
+## 0.47–0.50 — Faust analytics, charts & chat scrolling
+
+- **Faust through API 17** — a player-position **heat map**, region fill-% over time, new-vs-returning bars, a session timeline, an active-days grid, and castle world coordinates.
+- More readable charts (text that scales with UI size, selectable color themes), a **50–400% text-size slider**, settings grouped into titled cards, and clickable chat scroll arrows.
+
+## 0.31–0.46 — Faust integration (server investigation & analytics)
+
+- New **FAUST** tab group: Castle Info / Open Plots / All Plots / Decay Watch / Castle Resources, Player Info, Player Positions, Clans, and **Server Stats** dashboards (playtime, concurrency, DAU/WAU/MAU + retention, population by region). All version-gated to your server's Faust.
 
 ## 0.30.0 — Renamed: BloodCraftHub → Raphael, Lord of Wisdom
-- Rebranded to **Raphael, Lord of Wisdom** to reflect that it serves Bloodcraft, Beelzebub, Uriel,
-  KindredCommands, KindredLogistics + a standalone chat window (not just Bloodcraft), and to end the mix-up
-  with the separate *Bloodcraft* server mod. New package `kdpen/Raphael`, new GUID. No feature changes.
 
-## 0.29.x — Whisper overhaul · Uriel object-spawner overlay · server-switch fixes
-- Whisper anyone connected (incl. note-to-self); sent whispers show the recipient; Local-leak privacy fix;
-  Whispers tab restructured. Uriel object-spawner overlay. Server-switch re-detection + stuck-attack fixes.
+- Rebranded to reflect that it serves Bloodcraft, Beelzebub, Uriel, and the Kindred mods (plus a standalone chat window) — and to end the mix-up with the separate *Bloodcraft* **server** mod. New package + plugin ID; no feature changes.
 
-## 0.26 – 0.28 — Uriel integration + overlay-visibility controls
-- URIEL tab group (storage sharing, public storage, object spawning, prisons & stairs, admin). Timed
-  hide-all / launcher-hide / keep-native-chat-hidden controls.
+<details>
+<summary><b>Earlier history (v0.1–v0.29, as BloodCraftHub)</b></summary>
 
-## 0.18 – 0.25 — Beelzebub integration + chat/admin polish
-- BEELZEBUB tab group (abilities, loadouts, transforms, hotkeys, admin). Per-channel chat colors, typing
-  lock, secondary view-only chat window, loadout + admin recovery tooling.
+- **0.26–0.29** — Uriel integration (storage sharing, public storage, object spawning, prisons & stairs, admin); overlay-visibility controls; a whisper-anyone overhaul; server-switch re-detection fixes.
+- **0.18–0.25** — Beelzebub integration (abilities, loadouts, transforms, hotkeys, admin); per-channel chat colors; a secondary view-only chat window.
+- **0.15–0.17** — First public release: Bloodcraft / Kindred command UI + live HUD overlays + Eclipse coexistence; the standalone tabbed chat window.
+- **0.1–0.14** — Initial build-out: UI stack ported from BloodCraftUI (panthernet) + the signed Eclipse protocol (zfolmt).
 
-## 0.15 – 0.17 — First public release + chat overhaul
-- First release (Bloodcraft / Kindred command UI + live HUD overlays + Eclipse coexistence). Standalone
-  tabbed chat window, whisper-anyone roster, in-chat commands.
-
-## 0.1 – 0.14 — Initial build-out
-- UI stack ported from BloodCraftUI (panthernet) + signed Eclipse protocol from Eclipse (zfolmt); main
-  panel, forms, overlays, Bloodcraft command/regex pipelines.
+</details>

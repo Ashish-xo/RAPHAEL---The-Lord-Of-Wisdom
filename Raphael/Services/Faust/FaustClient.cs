@@ -106,7 +106,53 @@ internal static class FaustClient
     // heat map (api 16): binned player-position density grid. target = ""/all = server-wide, else a name/steamId.
     // The server-wide target MUST be sent explicitly as "all" — `.faust api heatmap <page>` would be parsed with
     // the page number AS the target ("nothing found"). So default the empty target to the literal "all".
-    public static void RequestHeatmap(string target, int page = 1) => Send($".faust api heatmap {Tok(string.IsNullOrEmpty(target) ? "all" : target)} {Num(page)}");
+    // api 16: `.faust api heatmap <scope> <page>`. api 19+ (Faust 0.16.4) inserts a time-window `<days>` arg
+    // (`.faust api heatmap <scope> <days> <page>`, 0 = all-time). The server's VCF matches by exact arg count, so
+    // send the 3-arg form ONLY when the server supports it; older Faust keeps the 2-arg form.
+    public static void RequestHeatmap(string target, int days, int page = 1)
+    {
+        string scope = Tok(string.IsNullOrEmpty(target) ? "all" : target);
+        Send(FaustState.SupportsHeatmapWindows
+            ? $".faust api heatmap {scope} {Num(days)} {Num(page)}"
+            : $".faust api heatmap {scope} {Num(page)}");
+    }
+
+    // §B1 boss board (api 18): the paged V Blood status board, and a single-boss lookup (one [FAUST:boss], no
+    // end trailer — like castleinfo). `<name>` is greedy server-side, so a multi-word boss name (e.g.
+    // "Solarus the Immaculate") works as a plain token-joined string; we still collapse whitespace so it
+    // stays a single VCF arg run.
+    public static void RequestBosses(int page = 1) => Send($".faust api bosses {Num(page)}");
+    // §16/§7: the server's VCF 0.10.4 has no greedy capture — `boss` takes a SINGLE token. Send the GUID, or a
+    // wire-safe (underscore-encoded) name so a multi-word entry stays one argument (avoids "too many parameters").
+    public static void RequestBoss(string nameOrGuid) => Send($".faust api boss {WireTok(nameOrGuid)}");
+
+    // §C1 worldscan (api 18): a filtered map of NPC units + resource nodes. `spec` is a SINGLE space-free,
+    // comma-joined key=value token (e.g. "type=units,bloodqmin=80"); `page` is a separate int. Default "all".
+    public static void RequestWorldScan(string spec, int page = 1)
+        => Send($".faust api worldscan {(string.IsNullOrWhiteSpace(spec) ? "all" : Tok(spec))} {Num(page)}");
+    // Admin whitelist management for worldscan (chat, visible). mode = list|add|remove|clear|seed; arg = guid|page.
+    public static void AdminWorldScan(string mode, string arg = null)
+        => SendAdmin(string.IsNullOrEmpty(arg) ? $".faust admin worldscan {Tok(mode)}" : $".faust admin worldscan {Tok(mode)} {Tok(arg)}");
+
+    // §7 prefab lookup helper (api 18, admin chat — NOT wire): resolve a PrefabGUID hash to its dev-name, or
+    // search the prefab catalog by a partial name → "<guid> <name>" rows. Handy for filling worldscan-whitelist
+    // / item-cost / proximity GUID fields without an external dump. `query` is sent wire-safe so a multi-word
+    // name fragment stays one VCF arg; an optional page paginates a name search. Replies are plain chat.
+    public static void AdminPrefab(string query, int page = 1)
+        => SendAdmin(page > 1 ? $".faust admin prefab {WireTok(query)} {Num(page)}" : $".faust admin prefab {WireTok(query)}");
+
+    // §C1/§B1 server-side diagnostics (admin chat — NOT wire): dump a prefab's category numbers + Faust's
+    // unit/node verdict (worldscandiag), or a V Blood entity's pooled/placed state (bossdiag) to tune
+    // classification. `fragment`/`target` optional; replies are plain chat.
+    public static void AdminWorldScanDiag(string fragment)
+        => SendAdmin(string.IsNullOrWhiteSpace(fragment) ? ".faust admin worldscandiag" : $".faust admin worldscandiag {WireTok(fragment)}");
+    public static void AdminBossDiag(string target = "")
+        => SendAdmin(string.IsNullOrWhiteSpace(target) ? ".faust admin bossdiag" : $".faust admin bossdiag {WireTok(target)}");
+
+    // §B2 kill leaderboards (api 18): top killers + per-boss defeat counts. [days=0] = all-time, else last N
+    // UTC days; both paged.
+    public static void RequestKills(int days = 0, int page = 1)     => Send($".faust api kills {Num(days)} {Num(page)}");
+    public static void RequestBossKills(int days = 0, int page = 1) => Send($".faust api bosskills {Num(days)} {Num(page)}");
 
     // ---- admin control (visible; Phase 2 admin tabs) ----
     // block <feature|all> [minutes] — disable now; with minutes, auto-reopen after the countdown.
@@ -130,6 +176,27 @@ internal static class FaustClient
     // wipe <activity|unlocks|usage|all>: WITHOUT confirm = server previews what would be erased; WITH confirm = erases.
     public static void AdminDataWipe(string store, bool confirm)
         => SendAdmin(confirm ? $".faust admin data wipe {Tok(store)} confirm" : $".faust admin data wipe {Tok(store)}");
+
+    // ---- live config editor (§3b / §15b, Faust 0.16): set/read/reset any Faust setting at runtime, no .cfg
+    // edit or restart. Per-feature + global. Acks are plain (untagged) System-chat — visible like the other
+    // admin mutations. <feature> = a handshake feature key; <setting>/<value> per the contract's §3b table.
+    // §17 (Faust 0.16.0 / VCF 0.10.4): the value list MUST arrive as a SINGLE space-free token of
+    // `setting=value` pairs (comma-joined for multiples). The old space-separated `set <f> <setting> <value>`
+    // form errors "Too many parameters" because the server's VCF matches by exact arg count (no [Remainder]).
+    public static void AdminSet(string feature, string setting, string value) => SendAdmin($".faust admin set {Tok(feature)} {Tok(setting)}={Tok(value)}");
+    // Apply MULTIPLE settings in ONE command. `spec` is a pre-built, space-free, comma-joined
+    // "setting=value,setting=value" string (built by the UI). Several two-part gates (cost = costitem+costqty,
+    // limit = period+maxuses) only enforce when both halves are set, so sending them in one spec is preferred.
+    public static void AdminSetPairs(string feature, string spec)
+    {
+        spec = (spec ?? "").Trim();
+        if (string.IsNullOrEmpty(spec)) return;
+        SendAdmin($".faust admin set {Tok(feature)} {spec}");
+    }
+    public static void AdminGet(string feature, string setting = "")          => SendAdmin(string.IsNullOrEmpty(setting) ? $".faust admin get {Tok(feature)}" : $".faust admin get {Tok(feature)} {Tok(setting)}");
+    public static void AdminResetCfg(string feature, string setting = "")     => SendAdmin(string.IsNullOrEmpty(setting) ? $".faust admin resetcfg {Tok(feature)}" : $".faust admin resetcfg {Tok(feature)} {Tok(setting)}");
+    public static void AdminSetGlobal(string setting, string value)           => SendAdmin($".faust admin setglobal {Tok(setting)}={Tok(value)}");
+    public static void AdminGetGlobal(string setting = "")                    => SendAdmin(string.IsNullOrEmpty(setting) ? ".faust admin getglobal" : $".faust admin getglobal {Tok(setting)}");
 
     private static string Num(int n) => n.ToString(CultureInfo.InvariantCulture);
 

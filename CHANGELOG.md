@@ -1,5 +1,437 @@
 # Changelog — Raphael, Lord of Wisdom
 
+## 0.64.0 — Live “Players now” map view + redesigned heat palettes
+
+- **See where online players are right now, on the map.** Faust → Player Positions → the map area now has a
+  **View** toggle: **Heat map** (aggregated history, as before) ↔ **Players now (live)** — a snapshot that plots
+  every online player as a dot on the same calibrated map, with their **name** beside each dot (toggle labels
+  off if it gets crowded; names are always on hover, along with coords / region / territory). Hit **Refresh
+  positions** to update it. Uses the same map underlay + coordinate calibration as the heat map.
+- **Redesigned heat-map color palettes.** The map-friendly schemes had too little variation between low and high
+  traffic. Replaced them with three proper, perceptually-graded ramps that sweep both hue *and* brightness (and
+  ramp opacity from translucent “less” to opaque “more”), so density reads clearly on top of the world map:
+  **Magma** (purple → magenta → orange → cream), **Ice→Fire** (blue → cyan → white → amber → red), and
+  **Viridis** (purple → teal → green → yellow). Cycle them with **Colors** on Player Positions (or Settings →
+  Heat map).
+
+## 0.63.1 — Dropdown fixes + Faust-tab cleanup (follow-up to 0.63.0)
+
+Testing-feedback fixes for the 0.63.0 dropdowns and some Faust-tab tidying.
+
+- **Online-player & castle dropdowns now actually populate for admins.** The auto-load was wrongly gated on the
+  feature's `admin` token — but admins *can* use admin-gated features, so the list stayed empty for the very
+  people who could see it. Removed that gate, and every picker now has an inline **Load** button to (re)pull the
+  list on demand (online players via `.faust api positions`, territories via `.faust api castles`).
+- **Boss tracker no longer leaves a boss stuck under “Look up one boss”.** The tracker's ~5s auto-refresh was
+  routing through the single-boss **lookup result** card, so a tracked boss showed there and never cleared (even
+  after you untracked it). Auto-refresh now updates only the overlay's cache; the result card shows only your own
+  manual lookups.
+- **World Map: fixed text running off the container.** Hint lines (e.g. the “Pick a Category…” help) now wrap
+  instead of overflowing. *(All in-game hint text benefits — the helper that builds them had word-wrap off.)*
+- **World Map: tidier filters + collapsible setup.** The everyday **Type / Category / Type** dropdowns + **Scan**
+  sit together; the GUID-level filters (prefab id / blood type / unit category / min blood quality) moved into a
+  collapsed **Advanced filters** section. The **Map underlay & coordinate overlay** setup is now collapsed by
+  default, so the **Assets** table sits right under the map (expand it only when aligning the map image).
+- **Player Positions: cleanup.** **Show players on map** (admin · experimental) moved to the bottom and collapsed.
+  Removed the **Scale** heat-map button — it did nothing once a map underlay was active (the underlay overrides
+  it); the setting still lives under Faust → Settings → Heat map.
+
+## 0.63.0 — Dropdowns everywhere: pick players, bosses & castles instead of typing
+
+Testing-feedback pass focused on the Faust tabs — fewer things to type by hand, and a clearer boss tracker.
+
+- **Active-player dropdowns.** Anywhere you enter a player name / SteamID — **Player Info**, the **heat-map**
+  per-player field, and **Admin → Player access** — there's now a dropdown of currently-online players (from
+  `.faust api positions`). Pick one and it fills the field + runs the lookup; the free-text box stays for anyone
+  not online. The list auto-loads when you're allowed to see it, with a **Reload online list** button otherwise.
+- **Boss lookup is a dropdown.** “Look up one boss” now has a **Pick a boss** dropdown built from the live board
+  merged with every known V Blood, so it's usable even before the (admin-gated) board loads. Selecting one looks
+  it up by GUID when it's on the board (most reliable), else by name. Typing still works for unlisted GUIDs.
+- **Boss tracker overlay now shows coordinates** for live bosses (`(x, z)`) next to HP and region — so you can
+  actually find them.
+- **Castle index is a dropdown.** **Castle Info** and **Castle Resources** now have a **Castle (index)** dropdown
+  listing every territory as `#index · region · (x, z) · owner` (from `.faust api castles`), so you never have to
+  know an index by heart. Typing an index still works.
+- **World Map filters are dropdowns and pre-filter the scan.** Category / Type / kind (Units/Nodes) are now proper
+  dropdowns. Picking a **Category** narrows the scan **server-side** (NPC factions → units, resource families →
+  nodes) so it pulls less data, then the client narrows the table/map to your exact Category / Type. The catalog
+  file gained an optional 4th field (`Category | Type | keywords | unittype=N|restier=N`) for finer server-side
+  filtering. *(A full per-unit checkbox picker and a prefab type-ahead were considered but deferred — Faust
+  doesn't expose a player-facing prefab catalog over the wire.)*
+- **Heat map: brighter, more visible dots + opacity control.** The map-friendly color ramps (Magenta / Cyan /
+  White-hot) are now bright at both ends with a higher opacity floor, so activity cells read clearly on the map.
+  Added a **Map image opacity** slider right on the Player Positions heat map (shares the World Map setting) so
+  you can fade the map art down and let the dots pop.
+- **Boss tracker: removed the redundant management card.** Tracking is now managed in one place — the board's
+  **+ Track / ★ Tracked** buttons. The Boss Status tab keeps just the overlay **show/hide** + **auto-refresh**
+  switches (no more separate name-list that duplicated the board).
+
+## 0.62.0 — Heat map: time windows (Faust 0.16.4 / API 19)
+
+- **The player-position heat map can now be filtered by time.** A new **When** toggle on Faust → Player Positions
+  cycles **All-time → Today → This week → This month**, re-querying the current (server or player) heat map for
+  that window. Needs **Faust 0.16.4+** (API 19); on older servers the toggle is hidden and the all-time map works
+  as before.
+- Added **`heatmapretentiondays`** (the server's per-day history cap, default 30) to the live config editor's
+  global settings — windows longer than retention just sum what's kept.
+
+## 0.61.0 — World Map catalog filter, map-friendly heat colors, lighter boss tracker
+
+- **World Map filter is now catalog-driven and works before you scan.** The Category / Type pickers come from a
+  built-in, **editable** catalog (`config/Raphael/worldscan_categories.txt`, format `Category | Type | keywords`),
+  so you can pre-select what you're after instead of having to load everything first. NPCs are grouped into clean
+  factions (Bandit, Undead, Gloomrot, Wildlife…) instead of raw prefab names, and resources into Ore / Wood /
+  Stone / Plants / Gems / Tech with proper types (Copper, Pine, Plant Fiber…). Add your own lines to the file to
+  extend it.
+- **Heat map: new color schemes that read on top of the map.** Added **Magenta**, **Cyan**, and **White-hot**
+  ramps designed to contrast with the world-map image, and heat-cell opacity now scales with intensity so the map
+  shows through low-traffic areas. Cycle them on Faust → Player Positions (or Settings → Heat map).
+- **Boss tracker auto-refresh now only refreshes your tracked bosses.** Instead of re-pulling the entire boss
+  board every ~5s, it does one quick per-boss lookup (`.faust api boss …`) for each boss you're tracking — far
+  lighter on the server. (Faust already has the per-boss query; Raphael now uses it.)
+- **Map default coordinates** updated to the latest in-game-aligned calibration.
+
+## 0.60.1 — World Map filter fixes; admin tools moved to Admin: Control
+
+- **Fixed the Category / Type filter actually grouping things usefully.** The taxonomy was rebuilt against real
+  V Rising resource-node names — plant-fiber bushes (which have “BushyTree” in their name) no longer read as Wood,
+  and variants (`_01/_02/_Stage1/_Pickup`) now collapse into clean types like **Plant Fiber, Copper, Pine, Spruce,
+  Rock, Emery, Gloomrot Tech**. So Category → Type now meaningfully narrows the table + map (previously most nodes
+  fell into one “Other” bucket, so cycling looked like it did nothing).
+- **Moved the world-scan admin tools** (the prefab **Whitelist** and the **Prefab lookup / diagnostics**) off the
+  World Map tab and onto **Faust → Admin: Control**, leaving the World Map tab player-focused (scan / filter / map).
+- **“Truncated” explained:** the notice now says the **server** hit its result cap and tells you to raise
+  **`worldscanmaxresults`** (Admin: Control → global settings; `0` = unlimited). On a busy map the server may still
+  cap at its configured `MaxResults` (e.g. 2000) until you raise it.
+- **Boss board (no Raphael change):** re-verified against the raw wire — the “Not spawned” bosses arrive with
+  **no coordinates at all** (`status=down`, no `x`/`z`), and Raphael's parser reads exactly what's sent and renders
+  the whole board. If Faust's `bossdiag` shows those bosses *do* have positions server-side, then Faust's `bosses`
+  endpoint isn't putting them on the wire — that's the server-side gap. Re-filed with the wire evidence.
+
+## 0.60.0 — World Map: search & filter by category / type
+
+- **New: cascading Category → Type filter on the World Map.** After a scan, narrow the results by a friendly
+  **Category** (NPC factions like “NPC · Bandit”, or resource families like “Resource · Ore / Stone / Wood /
+  Plants / Gems …”) and then by a specific **Type** within it (e.g. Ore → Copper). Both lists are built
+  automatically from whatever the scan returned — no PrefabGUIDs to type — and filtering is **instant and
+  client-side** (the table and the map both update, no re-query). The status line shows how many of the total
+  are matched.
+- A hint on the filter card explains that resource **nodes only appear if they're whitelisted on the server**
+  (use **Seed defaults** / add PrefabGUIDs) and to scan with Type = All or Nodes.
+- **Boss board (no Raphael change):** re-verified with the server now on **Faust 0.16.3** — the board is still
+  ~half “Not spawned” (the same roaming bosses), so the 0.16.3 location “combine” still isn't resolving them
+  server-side. Raphael fetches all pages and renders the whole board correctly; filed back to Faust with the
+  evidence (run `.faust admin bossdiag` and check the `Map tokens: N resolved` line — if 0, the token sources
+  aren't populated on this server).
+
+## 0.59.2 — Calibrated map defaults; Faust 0.16.3 note
+
+- **The world-map underlay now ships pre-calibrated.** The default coordinate bounds were updated to a set aligned
+  in-game against the captured Vardoran map, so a fresh install lands close to correct out of the box (fine-tune
+  with the calibration tool as needed). These bounds are shared by **both** the World Map and the player-position
+  **Heat Map**.
+- **Faust 0.16.3 — no Raphael change.** 0.16.3's fixes are server-side: roaming-boss locations (the status +
+  map-token "combine") and a world-scan filter fix so a narrow filter no longer fills up on common entities before
+  reaching rare matches. The wire is unchanged (ApiVersion 18); Raphael already handles both. Updated the Boss
+  Status note to reference 0.16.3.
+
+## 0.59.1 — Faust 0.16.2: bigger world scans; roaming-boss note
+
+- **World Map: bigger scans.** Faust 0.16.1 raised its result cap (2000 → 10000, or `0` = unlimited) so a busy
+  map's scan isn't cut short. Raphael now exposes **`worldscanmaxresults`** in the live config editor's global
+  settings, and added a **client-side safety cap (5000 rows)** so an unlimited, unfiltered scan can't page
+  hundreds of times or render tens of thousands of dots — when it's hit, you get the usual "narrow the filter"
+  notice. (No wire change.)
+- **Boss board:** Faust 0.16.2 changes how roaming-boss locations are found (it now combines the boss's status
+  with the game's own map-token tracking). This needs **no Raphael change** — the wire is unchanged; Raphael just
+  receives coordinates for more bosses once the **server** runs 0.16.2. Refreshed the Boss Status note to match.
+
+## 0.59.0 — World map fills the panel + live coordinate-overlay calibration
+
+- **The map now fills the panel width** (square, sized to the available width) instead of sitting as a small
+  centered square. The map image and the dot/heat/grid overlays all reflow to the new size.
+- **The map image and the coordinate overlay are now decoupled.** The image fills the board; the **dots** are
+  positioned by the calibration bounds, which you adjust independently (X and Z) — so aligning the coordinates no
+  longer distorts the map.
+- **New live calibration tool** (Faust → World Map → Map underlay): after a scan, **Move** the dot overlay
+  ◄ ► ▲ ▼ and **Stretch** it Wider / Narrower / Taller / Shorter (with a cycleable step size) until the
+  coordinates line up with the map, then click **Log calibration** to print the values to the BepInEx console so
+  they can be set as the baseline. Nudges the coordinate overlay only, never the map image.
+- **Boss board (no Raphael change):** re-verified after the server updated to **Faust 0.16.1** — Raphael fetches
+  all pages and accumulates the full list, but the board is unchanged (same roaming bosses still "Not spawned").
+  The 0.16.1 fix didn't catch them server-side; filed back to Faust with the evidence.
+
+## 0.58.6 — Docs: README + store-page readability overhaul
+
+- **Rewrote the README and the Thunderstore changelog for readability** (acting on tester/admin feedback that the
+  docs read as dense "AI slop"). The README dropped from ~456 lines to ~170: a tight intro + "What you get", a
+  short install section, and everything secondary (Eclipse/beta/controller heads-ups, BloodCraftHub migration,
+  full feature list, compatibility table, known issues, screenshots, dev notes) moved into **collapsible
+  sections**. Stale version references were corrected to the current line.
+- The Thunderstore changelog is now a **concise milestone history** (newest first, deep history collapsed).
+- **Packaging fix:** `package-release.ps1` now bundles `CHANGELOG.thunderstore.md` (the concise one) to the store
+  page instead of the full per-patch `CHANGELOG.md`; the full changelog remains the canonical archive on GitHub.
+- No functional/code changes.
+
+## 0.58.5 — Boss board note: reflect Faust 0.16.1's roaming-boss fix
+
+- **No functional change** — Faust 0.16.1 fixed the real "only half the bosses" cause entirely **server-side** (the
+  board read roaming V Bloods' position from a stale render matrix; it now reads the live sim position, so roamers
+  report **Live** with coordinates). The wire shape is unchanged (still ApiVersion 18), so Raphael needs no code
+  change — it simply receives coordinates for more bosses once the **server runs Faust 0.16.1**.
+- Updated the **Boss Status** explanation to describe the roaming-boss fix (the old text blamed only the ±5000 /
+  map-limit cutoff, which was a separate, secondary cause). Confirm your server's handshake reports `plugin=0.16.1`
+  before re-testing.
+
+## 0.58.4 — World map: fix the layout overlap (no more filters/caption colliding with the map)
+
+- **Fixed the map underlay overlapping its neighbors** — the filters above and the caption below no longer collide
+  with the map board. The square-aspect board is now driven from a **fixed height** (HeightControlsWidth), so the
+  page layout reserves the correct vertical space for it instead of the board expanding over its siblings.
+- *Still calibration, not a bug:* if markers line up horizontally but not vertically, the map image's **vertical**
+  world coverage doesn't match the Z bounds yet — adjust **World Z at bottom/top edge** (shift both together to
+  move the map up/down). Tell me one boss + where it should sit and I'll compute exact values.
+
+## 0.58.3 — World map: actually stop the stretch (square board + normalized dots)
+
+- **The map underlay no longer renders stretched.** The previous aspect fix corrected the world rectangle but the
+  board's *pixels* were still force-stretched to the panel width by the layout, so the square map looked squished.
+  The board now holds the image's aspect with an **AspectRatioFitter** (stays square no matter the panel width),
+  and all dots / heat cells / grid lines are positioned by **normalized anchors** (0–1) instead of pixel offsets,
+  so they fill the board correctly at any size. Applies to both the **World Map** and the **Heat Map**.
+- Map *position* alignment is still set by the four calibration bounds (the captured texture's exact world
+  coverage isn't documented) — calibrate with **Use heat-map bounds** + the bound fields.
+
+## 0.58.2 — World map underlay: fix the skewed/stretched map image
+
+- **Fixed the map image rendering stretched** on the World Map and Heat Map. The captured V Rising map is square,
+  but the board was sized to the (non-square) calibration rectangle, so the image got vertically/horizontally
+  stretched. The render rectangle now **matches the image's aspect ratio** automatically (center-preserving), so
+  the map draws undistorted and the dots share its space. Calibrate position/scale with the four bound fields (or
+  **Use heat-map bounds**) as before — they now stay square to the image.
+
+## 0.58.1 — Boss coords: fully trust Faust (remove the client cutoff)
+
+- Finished the §18 follow-up from Faust's updated contract: Raphael's boss **location guard is now removed entirely**
+  (was raised to 9990 in 0.57.2). Faust decides a boss's live/down state server-side via its tunable
+  `[Faust.Bosses] MapLimit` (now up to 20000) and only sends coordinates for bosses it classifies on-map, so
+  Raphael displays whatever coordinates it receives — no client-side distance filter that could re-hide a far boss
+  if an admin raises the limit. `FaustBoss.OnMap` is now simply "has a position."
+- *Note:* this only governs how Raphael **displays** boss positions. A board still showing many "Not spawned" rows
+  means the **server** isn't running the fixed Faust yet — the live handshake reports `plugin=0.16.0`, and the boss
+  data is unchanged, so the 0.16.1 `MapLimit` fix needs to be built and deployed to the game server (then restart).
+
+## 0.58.0 — Capture the world-map image from the running game (no external tools)
+
+- **New: “Capture map from game” on Faust → World Map → Map underlay.** V Rising ships its art inside hashed
+  Addressable archives (no loose image file to copy), so Raphael now grabs the map **texture from the running
+  game** instead: open the in-game map once (press **M**) so it loads, then click **Capture** — Raphael scans the
+  game's loaded textures, logs the candidates to the BepInEx log, and saves the best match to
+  `config/Raphael/worldmap.png` (then **Reload image** / calibrate). If the auto-pick isn't the map, the log lists
+  every candidate texture name — type part of the right one into the **filter** field and capture again.
+  *Experimental:* the map texture's name is undocumented, so it may take a try or two with the filter to land the
+  right one.
+- This is the answer to “can't you pull the map from my game files?” — the files are archived, but the live
+  texture can be captured. Still fully local and client-side.
+
+## 0.57.3 — Map underlay: clearer image status
+
+- The **Map underlay** card now shows a plain **image status line** — whether `worldmap.png` was loaded (with its
+  dimensions), or, if not, exactly where to drop it (`BepInEx/config/Raphael/worldmap.png`) and to click **Reload
+  image**. This makes it obvious that a black-background-with-grid map just means no image file is present yet
+  (the grid is the always-on fallback; the world-map picture is a file you supply). No behavior change to the
+  rendering itself.
+
+## 0.57.2 — Boss coords fix: drop the old ±5000 guard (Faust 0.16.1, §18 resolved)
+
+- **Live outer-region bosses now show their location instead of “—”.** `.faust admin bossdiag` proved the V Rising
+  map extends well past ±5000 and that V Bloods keep their **real** positions (there's no ~10000 sentinel-parking,
+  contrary to the earlier assumption). Faust raised its default live/down threshold to **9000**, and Raphael's
+  leftover **±5000 client-side coord guard** (from the old §16 fix) — which would have re-hidden those now-correct
+  coordinates — has been removed; Raphael now trusts Faust's positions (keeping only a defensive guard against the
+  literal ~10000 off-map sentinel).
+- Updated the **Boss map limit** control accordingly: default shown as **9000**, range widened to **20000** (matching
+  Faust), with clearer guidance; the on-tab note and the config editor's `bossmaplimit` hint were refreshed.
+- With this, **§18 (live bosses reading “Not spawned”) is resolved.**
+
+## 0.57.1 — Boss board: tune the live/“Not spawned” threshold from the UI (Faust 0.16.1)
+
+- **Faust 0.16.1 makes the boss live-vs-down threshold tunable**, and Raphael now surfaces it. If real,
+  in-world V Bloods show as **“Not spawned”**, the **Boss Status** tab has a new **Boss map limit** field +
+  **Set limit** button (admin) — raise it toward **6000–8000** (keep under ~10000) and Refresh. Drives Faust's
+  new `.faust admin setglobal bossmaplimit=N`. The on-tab note now explains the fix, and `bossmaplimit` was also
+  added to the live config editor's global settings.
+- Background: V Rising parks not-currently-active V Bloods off-map (correctly “down”), but an outer-region boss
+  whose real position sits just past the threshold was being mis-classed — that's the case this knob fixes.
+  Genuinely parked bosses still read “down” (locating them needs spawn-zone data, a separate Faust effort).
+
+## 0.57.0 — World map underlay (grid + drop-in map image), blood column split, boss-board note
+
+Testing follow-ups for the Faust World Map / Boss Status.
+
+- **World Map & Heat Map now have a frame of reference.** Both boards used to draw on a bare black background;
+  they now show a **coordinate grid with corner X/Z labels** behind the dots, and can draw a **real world-map
+  image** if you supply one. Drop V Rising's world-map texture (extract it from the game files, e.g. with
+  AssetRipper) into `BepInEx/config/Raphael/worldmap.png`, then on **Faust → World Map → Map underlay** click
+  **Reload image** and calibrate the four world-edge values (a **Use heat-map bounds** button pre-fills Faust's
+  authoritative full-map bounds). When a backdrop is on, both boards render to that fixed world rectangle so dots
+  land in their true map location. Grid/image toggles + image opacity are on the same card (and in Settings).
+- **World Map table: blood is now two columns** — **Blood** (type) and **Q** (quality %) — instead of one
+  combined cell.
+- **Boss Status:** added an in-panel note explaining that some V Bloods alive in the world can still read
+  **“Not spawned”** — V Rising lazy-spawns many V Bloods so Faust can't always resolve their position; it's a
+  **server-side detection limit, not a Raphael paging issue** (verified from the log: Raphael loads the entire
+  board — all pages). Added an admin **Diagnose detection** button (`.faust admin bossdiag`) to help the Faust
+  side fix it, and corrected the Show-filter default label (it's **All**).
+
+## 0.56.0 — World Map: unit categories, resource tiers + in-game prefab lookup (Faust 0.16.x)
+
+Follow-up pass consuming the rest of Faust 0.16's API-18 batch on the **World Map** tab. Gated on Faust 0.16+.
+
+- **World Map now shows unit categories & resource tiers.** Each scanned asset carries Faust's
+  `EntityCategory` classification — NPC units show a **category** number and resource nodes a **tier** number
+  (in the table's Kind column and the map-dot tooltips). A new **Unit category** filter narrows units to one
+  category. (The numbers are the game's raw category ints; use the new audit button below to discover them.)
+- **In-game prefab lookup (admin).** A new **Prefab lookup & diagnostics** card on the World Map tab: type a
+  **PrefabGUID** to get its dev-name, or a **partial name** to search the catalog — so you can fill the
+  whitelist / item-cost / proximity GUID fields without an external dump (`/.faust admin prefab`). An **Audit
+  scan** button (`.faust admin worldscandiag`) dumps a prefab's category numbers + Faust's unit/node verdict so
+  you can set the category filter. Replies appear in chat.
+- Under the hood: Raphael now reads the `unittype`/`restier` tokens Faust adds to each `worldscan` asset row
+  (additive — older Faust simply omits them).
+
+## 0.55.0 — New: World Map tab + the config-editor "Set" fix (Faust 0.16.x)
+
+Faust shipped the fixes plus a new server-side scan, all consumed here. Gated on Faust 0.16+ (API 18).
+
+- **New: World Map tab (Faust → World Map).** A filterable map of in-world **NPC units** (with blood type and
+  quality) and **resource nodes**, scanned **server-side by Faust** and rendered here. Filter by **type**
+  (units / nodes / all), a specific **prefab ID**, a **blood type**, and a **minimum blood-quality slider**;
+  results show as both a **table** and an **X/Z dot map** (units coloured by blood quality, resource nodes
+  green — hover any dot for details). Honors Faust's "truncated — narrow the filter" notice. Includes admin
+  **whitelist** controls (list / add / remove / seed / clear). Admin-default (it reveals the whole map).
+  *(This is server-side scanning — Faust scans and Raphael only renders the data it sends — distinct from the
+  removed client-side scan; V Bloods are excluded here, they live on the Boss Status tab.)*
+- **Fixed: the config editor "Set" actions now work.** Faust 0.16 changed the command syntax (its chat-command
+  framework can't take a multi-word value), so Raphael now sends settings as a single `setting=value,setting=
+  value` token — e.g. `set castleinfo costitem=…,costqty=…`. The earlier *"Too many parameters"* error is gone.
+- **Boss lookup** now sends the boss name/GUID as a single token (matching the new server parser), so the
+  single-boss lookup no longer errors on multi-word input.
+
+## 0.54.5 — Diagnosed two issues to the Faust server side (filed upstream) + in-panel notes
+
+Investigated both via the BepInEx diagnostic log; **both are server-side (Faust) and Raphael is behaving
+correctly** — filed precise fixes in `docs/FAUST_API_REQUESTS.md` (§17, §18).
+
+- **Config editor “Set … Too many parameters” error = a Faust bug.** Raphael sends a correct command
+  (verified in the log, e.g. `set castleinfo costitem 862477668 costqty 100`); Faust's `set`/`setglobal`
+  commands are **missing the `[Remainder]` attribute** on their value parameter, so the chat-command framework
+  rejects any value with *“Too many parameters.”* There is no client workaround — it needs a one-line Faust
+  fix. The config editor now shows a note explaining this; **Get current values still works**.
+- **Boss board “Not spawned” bosses = Faust's live-detection, not a Raphael paging bug.** The log confirms
+  Raphael fetches the **whole** board (all pages, e.g. `count=52`) and shows exactly the `up`/`down` status
+  Faust sends. Bosses appearing as **Not spawned** are reported that way by Faust (`status=down` on the wire).
+  The boss tab now clarifies what Live / Not spawned mean; whether a specific boss is mis-classified is a
+  Faust-side question (filed with detail for the Faust dev).
+
+## 0.54.4 — Boss board shows all bosses; config-editor input hints + validation (tester feedback)
+
+- **Boss board defaults to “All” again, so nothing is hidden.** The 0.54.2 default (“Live + defeated”) was
+  hiding the pooled / not-spawned V Bloods that Faust returns — they’re back by default. Down bosses now read
+  **“Not spawned”** (instead of bare dashes) so they’re clearly a known-but-inactive boss, not a blank row.
+  The **Show** filter still lets you narrow to Live + defeated / Live only.
+- **Config editor: every numeric field now has a description.** Each row (Cost, Cooldown, Limit, Proximity)
+  has a one-line explanation under it — e.g. *“Period s = the period length in seconds (3600 = hour, 86400 =
+  day); Window s = optional grace window”* — so the terse field labels are no longer ambiguous.
+- **Config editor: clearer errors on bad input.** Entering something that isn’t a number (e.g. an item **name**
+  instead of its PrefabGUID hash) now shows an immediate in-panel hint instead of bouncing a server reject —
+  *“Item is the prefab GUID hash (e.g. 576389135), not the item name.”* (Cost/limit/proximity all validate.)
+  Reminder: setting an item cost takes the item’s **numeric PrefabGUID**, not its display name.
+
+## 0.54.3 — Fix: config editor "Set cost" (and limit / proximity) errored on multi-value rows
+
+- **Fixed: setting a two-value gate from the config editor (e.g. cost = item GUID + quantity) errored.** The
+  multi-value rows (Cost, Limit, Proximity) were sending one `.faust admin set` command **per field**, fired
+  back-to-back in the same frame — the server dropped/errored on the second. They now send a **single**
+  command with all the pairs at once (`set <feature> costitem <guid> costqty <n>`), which Faust applies in one
+  go. (Matches why it worked when you set the values one at a time before.)
+
+## 0.54.2 — Boss board filter + one-click tracking; config editor cleanup (tester feedback)
+
+- **Boss board: a “Show” filter, so the board isn’t flooded with blank-looking rows.** Faust pre-instantiates
+  much of the V Blood roster as “not spawned”, which filled the board with sparse rows. The board now defaults
+  to **Live + defeated** (hiding bosses that are neither in the world nor ever killed); cycle the **Show**
+  button for **All** or **Live only**. The status line shows “X shown / Y total”.
+- **Boss board: one-click tracking.** Every board row now has a **+ Track / ★ Tracked** button that adds or
+  removes that boss from the tracker overlay — no more typing names. (The typed-name field stays as a way to
+  pre-add a boss that isn’t on the board yet.) Adding/removing anywhere keeps the board buttons, the tracker
+  list, and the overlay in sync.
+- **Config editor reorganized.** **Get current values** and **Reset feature** now sit directly under the
+  feature selector, so you can read the live values *before* changing anything. The separate **Any setting**
+  cycler is gone — the inline rows now cover **every** per-feature setting (access, PvP, delivery, admins-exempt,
+  cost, cooldown, usage-limit, proximity, and the unlock criterion incl. a *BossKill:&lt;guid&gt;* input), each
+  on its own row with its own control(s).
+- *Note on boss names:* names already resolve to the in-game friendly form for the classic V Bloods; any newer
+  boss not in the map falls back to a tidied prefab name. With the default filter most boards now show only
+  named, meaningful rows.
+
+## 0.54.1 — Boss board polish + boss-tracker overlay (tester feedback on 0.54.0)
+
+- **Boss names are now the in-game player-friendly names.** The Boss Status board and the boss-defeat
+  leaderboard show e.g. *Dracula the Immortal King* instead of the raw `CHAR_…_VBlood` prefab name (resolved
+  from the V Blood's PrefabGUID; unknown / modded bosses fall back to a tidied dev-name).
+- **No more bogus boss coordinates.** Bosses that exist as a pooled / staged entity reported a far-off limbo
+  position (e.g. 10000,10000) and showed as "outside the map"; those are now treated as having no real map
+  position (the Loc column shows "—") so only genuinely-placed bosses display coordinates.
+- **New: Boss Tracker overlay.** A small movable HUD that tracks up to **3** chosen V Bloods' status (live /
+  defeated, with HP) at a glance. Assign bosses on **Faust → Boss Status** (type a name + *Add to tracker*),
+  toggle it from there or the main-panel **Show overlays** footer (**Boss Tracker**), and optionally enable
+  **auto-refresh (~5s)**. It's a standard overlay — opacity, text-size, transparency slider, and **Lock
+  overlays** all apply. (Auto-refresh is opt-in and bounded by the Faust query cooldown to limit server load.)
+- **Config editor: common gates as straight-line rows.** The Live config editor now has a **Quick set** section
+  with dedicated rows — Access, PvP, Cost (item + qty), Cooldown, Limit (uses / period / window), and Proximity
+  (object + metres) — each with its own field(s) and Set button, so you no longer have to cycle the setting
+  picker for the common ones. The generic per-setting cycler remains for everything else.
+
+## 0.54.0 — Faust 0.16 (API 18): boss board, kill leaderboards, live config editor
+
+Consumes the new **Faust, Lord of Investigation 0.16** server features (wire API 18). All of it is gated on
+the Faust handshake, so it only appears on servers running Faust 0.16+; older Faust degrades gracefully with
+a "needs Faust 0.16+" note.
+
+- **New: Boss Status tab (Faust → Boss Status).** A server-wide **V Blood status board** — which bosses are
+  **live in the world right now** (with map location, region, an HP bar and level) and which have been
+  **defeated**. Faust sees the whole map, so it reports bosses your client can't. Includes a **single-boss
+  lookup** (type a name — multi-word names work — or a PrefabGUID). Admin-default (boss locations are intel).
+- **New: Leaderboards tab (Faust → Leaderboards).** Two server boards from Faust's kill tracking — the **top
+  killers** (with how many of their kills were PvP) and the **most-defeated V Bloods** — with a
+  **today / this week / all-time** window selector. Admin-default; needs the server's kill-tracking on.
+- **New: Live config editor (Faust → Admin: Control).** Admins can now change a feature's **cost, cooldown,
+  usage limit** (uses / period / window), **proximity** requirement, **access**, **PvP availability**, or
+  **unlock** criterion — plus **global** settings (anti-spam, data collection, heat-map, map markers) —
+  **at runtime**, with no config-file edit or server restart. Faust's confirmation appears in chat. (This
+  resolves the earlier limitation where these gates were config-file-only with no way to set them from the UI.)
+- **Admin: Oversight now shows each feature's gates.** The Access table gained a **Gates** column listing the
+  configured cooldown / usage-limit / proximity for each feature (read-only), alongside the existing cost.
+- **Fixed (server-side): the "Data status" button works again.** The Faust **Admin → Data status** button no
+  longer errors on busy servers — Faust 0.16 fixed the oversized-reply bug that was throwing in the chat
+  command framework. The data-wipe control also gained the new **heatmap** and **kills** stores.
+
+## 0.53.0 — Quick Spawn overlay: footer toggle + transparency
+
+- **Familiar Quick Spawn overlay now has a footer quick-toggle.** The overlay added in 0.52.0 could only be
+  shown/hidden from the All Familiars tab; it now has a **Quick Spawn** toggle in the main panel's
+  **Show overlays** footer alongside every other overlay, so you can stash/restore it with one click.
+- **Quick Spawn transparency slider.** Added a **Quick Spawn** row to **Settings → Display → Overlay
+  transparency**. The overlay already honored the overlay opacity, text-size and **Lock overlays** controls;
+  it now sits with the other overlays under the transparency sliders too, so it's fully covered by the
+  standard overlay controls.
+- **Faust (server-side, filed upstream):** the **Faust → Admin "data status"** button can return a VCF error
+  on busier servers — this is a reply-size bug **inside the Faust mod** (its status text overruns the chat
+  command framework's 512-byte limit), so Raphael can't work around it; it's been filed for the Faust dev.
+  Likewise, per-feature **cost / cooldown / usage-limit / proximity** gates are Faust **config-file** settings
+  with no chat command behind them, so Raphael's admin tabs can't drive them yet — also filed upstream.
+
 ## 0.52.0 — New: Familiar Quick Spawn overlay
 
 - **New: Familiar Quick Spawn overlay (Bloodcraft).** A small, draggable overlay with up to **5 one-click

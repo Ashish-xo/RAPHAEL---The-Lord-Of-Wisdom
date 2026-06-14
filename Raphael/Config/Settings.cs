@@ -142,6 +142,7 @@ public class Settings
     public static float FamiliarOverlayTransparency  => GetFloat(nameof(FamiliarOverlayTransparency),  UITransparency);
     public static float FamiliarBrowserTransparency  => GetFloat(nameof(FamiliarBrowserTransparency),  UITransparency);
     public static float FamiliarQuickSpawnOverlayTransparency => GetFloat(nameof(FamiliarQuickSpawnOverlayTransparency), UITransparency);
+    public static float FaustBossTrackerOverlayTransparency => GetFloat(nameof(FaustBossTrackerOverlayTransparency), UITransparency);
     public static float ShiftSpellOverlayTransparency => GetFloat(nameof(ShiftSpellOverlayTransparency), UITransparency);
     public static float QuickActionsOverlayTransparency => GetFloat(nameof(QuickActionsOverlayTransparency), UITransparency);
     public static float BeelzActionBarOverlayTransparency => GetFloat(nameof(BeelzActionBarOverlayTransparency), UITransparency);
@@ -156,6 +157,7 @@ public class Settings
     public static void SetFamiliarOverlayTransparency(float v)  => SetFloat(nameof(FamiliarOverlayTransparency), v);
     public static void SetFamiliarBrowserTransparency(float v)  => SetFloat(nameof(FamiliarBrowserTransparency), v);
     public static void SetFamiliarQuickSpawnOverlayTransparency(float v) => SetFloat(nameof(FamiliarQuickSpawnOverlayTransparency), v);
+    public static void SetFaustBossTrackerOverlayTransparency(float v) => SetFloat(nameof(FaustBossTrackerOverlayTransparency), v);
     public static void SetShiftSpellOverlayTransparency(float v) => SetFloat(nameof(ShiftSpellOverlayTransparency), v);
     public static void SetQuickActionsOverlayTransparency(float v) => SetFloat(nameof(QuickActionsOverlayTransparency), v);
     public static void SetBeelzActionBarOverlayTransparency(float v) => SetFloat(nameof(BeelzActionBarOverlayTransparency), v);
@@ -699,6 +701,8 @@ public class Settings
     public static bool ShowFamiliarOverlay     => (ConfigEntries[nameof(ShowFamiliarOverlay)]     as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowFamiliarBrowser     => (ConfigEntries[nameof(ShowFamiliarBrowser)]     as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowFamiliarQuickSpawnOverlay => (ConfigEntries[nameof(ShowFamiliarQuickSpawnOverlay)] as ConfigEntry<bool>)?.Value ?? false;
+    public static bool ShowFaustBossTrackerOverlay => (ConfigEntries[nameof(ShowFaustBossTrackerOverlay)] as ConfigEntry<bool>)?.Value ?? false;
+    public static bool FaustBossTrackerAutoRefresh => (ConfigEntries[nameof(FaustBossTrackerAutoRefresh)] as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowDailyQuestOverlay   => (ConfigEntries[nameof(ShowDailyQuestOverlay)]   as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowProfessionOverlay   => (ConfigEntries[nameof(ShowProfessionOverlay)]   as ConfigEntry<bool>)?.Value ?? false;
     public static bool ShowShiftSpellOverlay   => (ConfigEntries[nameof(ShowShiftSpellOverlay)]   as ConfigEntry<bool>)?.Value ?? false;
@@ -1039,6 +1043,59 @@ public class Settings
         if (t.Length == 0) return false;
         return GetFamiliarQuickSpawnSlots().Exists(x => string.Equals(x, t, System.StringComparison.OrdinalIgnoreCase));
     }
+
+    // ── Faust boss-tracker overlay (up to 3 tracked V Bloods). Stored '|'-delimited (friendly names). ──
+    public const int FaustBossTrackerMaxSlots = 3;
+    public static void SetShowFaustBossTrackerOverlay(bool v) => SetBool(nameof(ShowFaustBossTrackerOverlay), v);
+    public static void SetFaustBossTrackerAutoRefresh(bool v) => SetBool(nameof(FaustBossTrackerAutoRefresh), v);
+    private static string FaustBossTrackerSlotsRaw
+    {
+        get => (ConfigEntries.TryGetValue(nameof(FaustBossTrackerSlotsRaw), out var e) && e is ConfigEntry<string> s) ? (s.Value ?? "") : "";
+        set { if (ConfigEntries.TryGetValue(nameof(FaustBossTrackerSlotsRaw), out var e) && e is ConfigEntry<string> s) s.Value = value ?? ""; }
+    }
+    public static System.Collections.Generic.List<string> GetFaustBossTrackerSlots()
+    {
+        var list = new System.Collections.Generic.List<string>();
+        var raw = FaustBossTrackerSlotsRaw;
+        if (!string.IsNullOrEmpty(raw))
+            foreach (var part in raw.Split('|'))
+            {
+                var t = part.Trim();
+                if (t.Length > 0 && list.Count < FaustBossTrackerMaxSlots) list.Add(t);
+            }
+        return list;
+    }
+    private static void WriteFaustBossTrackerSlots(System.Collections.Generic.List<string> slots)
+    {
+        var clean = new System.Collections.Generic.List<string>();
+        if (slots != null)
+            foreach (var s in slots)
+            {
+                var t = (s ?? "").Trim();
+                if (t.Length > 0 && clean.Count < FaustBossTrackerMaxSlots) clean.Add(t);
+            }
+        FaustBossTrackerSlotsRaw = string.Join("|", clean);
+    }
+    /// <summary>Append a V Blood to the boss-tracker list (no-op if already present or full). Returns true if added.</summary>
+    public static bool AddFaustBossTrackerSlot(string name)
+    {
+        var t = (name ?? "").Trim();
+        if (t.Length == 0) return false;
+        var list = GetFaustBossTrackerSlots();
+        if (list.Count >= FaustBossTrackerMaxSlots) return false;
+        if (list.Exists(x => string.Equals(x, t, System.StringComparison.OrdinalIgnoreCase))) return false;
+        list.Add(t);
+        WriteFaustBossTrackerSlots(list);
+        return true;
+    }
+    public static void RemoveFaustBossTrackerSlot(string name)
+    {
+        var t = (name ?? "").Trim();
+        var list = GetFaustBossTrackerSlots();
+        list.RemoveAll(x => string.Equals(x, t, System.StringComparison.OrdinalIgnoreCase));
+        WriteFaustBossTrackerSlots(list);
+    }
+
     public static void SetShowDailyQuestOverlay(bool v) => SetBool(nameof(ShowDailyQuestOverlay), v);
     public static void SetShowProfessionOverlay(bool v) => SetBool(nameof(ShowProfessionOverlay), v);
     public static void SetShowShiftSpellOverlay(bool v) => SetBool(nameof(ShowShiftSpellOverlay), v);
@@ -1056,8 +1113,8 @@ public class Settings
     public static void SetFaustChartColor(int v) => SetInt(nameof(FaustChartColor), UnityEngine.Mathf.Clamp(v, 0, 5));
     // Heat-map intensity gradient (low→high): 0=Theme color (black→chart color), 1=Heat (black→red→yellow→white),
     // 2=Green (black→green→white), 3=Mono (black→white). A true cold→hot ramp reads far better than one flat hue.
-    public static int FaustHeatGradient => UnityEngine.Mathf.Clamp((ConfigEntries[nameof(FaustHeatGradient)] as ConfigEntry<int>)?.Value ?? 1, 0, 3);
-    public static void SetFaustHeatGradient(int v) => SetInt(nameof(FaustHeatGradient), UnityEngine.Mathf.Clamp(v, 0, 3));
+    public static int FaustHeatGradient => UnityEngine.Mathf.Clamp((ConfigEntries[nameof(FaustHeatGradient)] as ConfigEntry<int>)?.Value ?? 1, 0, 6);
+    public static void SetFaustHeatGradient(int v) => SetInt(nameof(FaustHeatGradient), UnityEngine.Mathf.Clamp(v, 0, 6));
     // Heat-map render detail: 0=Native (Faust's finest cell), 1=Grouped 2×, 2=Grouped 4×. Coarsening merges
     // N×N cells client-side to smooth sparse data into blobs. Cannot go FINER than Faust's [Faust.Heatmap] CellSize.
     public static int FaustHeatDetail => UnityEngine.Mathf.Clamp((ConfigEntries[nameof(FaustHeatDetail)] as ConfigEntry<int>)?.Value ?? 0, 0, 2);
@@ -1067,6 +1124,29 @@ public class Settings
     // doesn't send mapbounds (api <17).
     public static int FaustHeatScale => UnityEngine.Mathf.Clamp((ConfigEntries[nameof(FaustHeatScale)] as ConfigEntry<int>)?.Value ?? 0, 0, 1);
     public static void SetFaustHeatScale(int v) => SetInt(nameof(FaustHeatScale), UnityEngine.Mathf.Clamp(v, 0, 1));
+
+    // ---- Faust world-map underlay (#3): a coordinate-grid frame of reference + optional drop-in map image
+    // behind the World Map asset plot and the Heat Map, so the dots have a real frame of reference instead of a
+    // bare black board. The image is a user-supplied PNG at config/Raphael/worldmap.png (extract it from the game
+    // assets); it's stretched to the world rectangle [MinX..MaxX]×[MinZ..MaxZ] below, which the user calibrates so
+    // the dots land in the right place. The grid always draws (cheap, no asset). ----
+    public static bool  FaustWorldMapGrid     => (ConfigEntries[nameof(FaustWorldMapGrid)] as ConfigEntry<bool>)?.Value ?? true;
+    public static void  SetFaustWorldMapGrid(bool v) => SetBool(nameof(FaustWorldMapGrid), v);
+    public static bool  FaustWorldMapImage    => (ConfigEntries[nameof(FaustWorldMapImage)] as ConfigEntry<bool>)?.Value ?? true;
+    public static void  SetFaustWorldMapImage(bool v) => SetBool(nameof(FaustWorldMapImage), v);
+    public static float FaustWorldMapOpacity  => UnityEngine.Mathf.Clamp01(GetFloat(nameof(FaustWorldMapOpacity), 0.55f));
+    public static void  SetFaustWorldMapOpacity(float v) => SetFloat(nameof(FaustWorldMapOpacity), UnityEngine.Mathf.Clamp01(v));
+    // World rectangle the map image covers (game X/Z). Defaults derived from Faust's authoritative buildable
+    // mapbounds on the test server (cell-25 × [-105:-115:-21:12] ≈ X[-2625,-500] Z[-2875,325]); calibrate per map.
+    public static float FaustWorldMapMinX => GetFloat(nameof(FaustWorldMapMinX), -2900f);
+    public static float FaustWorldMapMaxX => GetFloat(nameof(FaustWorldMapMaxX),   180f);
+    public static float FaustWorldMapMinZ => GetFloat(nameof(FaustWorldMapMinZ), -2400f);
+    public static float FaustWorldMapMaxZ => GetFloat(nameof(FaustWorldMapMaxZ),   650f);
+    public static void  SetFaustWorldMapBounds(float minX, float maxX, float minZ, float maxZ)
+    {
+        SetFloat(nameof(FaustWorldMapMinX), minX); SetFloat(nameof(FaustWorldMapMaxX), maxX);
+        SetFloat(nameof(FaustWorldMapMinZ), minZ); SetFloat(nameof(FaustWorldMapMaxZ), maxZ);
+    }
     // Per-query-type cooldown (seconds) on Faust server reads — stops spam-clicking Refresh from hammering
     // the server (important with many simultaneous players). 0 disables. Default 5.
     public static int FaustQueryCooldownSeconds => (ConfigEntries[nameof(FaustQueryCooldownSeconds)] as ConfigEntry<int>)?.Value ?? 5;
@@ -1431,6 +1511,9 @@ public class Settings
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowFamiliarBrowser),         false, "Whether the Familiar Browser overlay was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowFamiliarQuickSpawnOverlay), false, "Whether the Familiar Quick Spawn overlay (up to 5 one-click familiar-summon buttons) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FamiliarQuickSpawnSlotsRaw),   "",    "The familiars pinned to the Quick Spawn overlay — a '|'-delimited list of up to 5 familiar names. Edited from the All Familiars tab.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowFaustBossTrackerOverlay),  false, "Whether the Faust boss-tracker overlay (up to 3 tracked V Blood statuses) was visible at last logout.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FaustBossTrackerSlotsRaw),     "",    "The V Bloods pinned to the boss-tracker overlay — a '|'-delimited list of up to 3 boss names. Edited from the Faust → Boss Status tab.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FaustBossTrackerAutoRefresh),  false, "When on, the boss-tracker overlay re-queries the Faust boss board every ~5s (bounded by the Faust query cooldown). Off by default to avoid extra server load.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowDailyQuestOverlay),       false, "Whether the Daily Quest overlay was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowProfessionOverlay),       false, "Whether the Professions overlay (Bloodcraft profession levels) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowShiftSpellOverlay),       false, "Whether the Shift-spell cooldown overlay (Eclipse-style visual readout for the slot-3 ability) was visible at last logout.");
@@ -1444,6 +1527,15 @@ public class Settings
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustHeatGradient),              1,     "Faust heat-map color ramp (low→high traffic): 0=Theme (black→chart color), 1=Heat (black→red→yellow→white), 2=Green (black→green→white), 3=Mono (black→white). Set via Faust → Settings → Heat map.");
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustHeatDetail),                0,     "Faust heat-map render detail: 0=Native (Faust's finest cell), 1=Grouped 2×, 2=Grouped 4×. Higher = merge cells into bigger blobs (smooths sparse data); cannot exceed Faust's own CellSize resolution. Set via Faust → Settings → Heat map.");
         InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustHeatScale),                 0,     "Faust heat-map board extent: 0=Map (draw to the full buildable-map bounds — true scale, needs Faust api 17+), 1=Zoom (size to just the occupied cells). Set via Faust → Settings → Heat map.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustWorldMapGrid),               true,  "Faust World Map / Heat Map: draw a coordinate grid + axis labels behind the dots as a frame of reference (no asset needed).");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustWorldMapImage),              true,  "Faust World Map / Heat Map: draw the drop-in world-map image (config/Raphael/worldmap.png) behind the dots when present. Extract it from the game assets; calibrate with the bounds below.");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FaustWorldMapOpacity),            0.55f, "Faust World Map / Heat Map underlay image opacity (0.0=invisible, 1.0=solid).");
+        // Default calibration = the values KDPen aligned in-game against the captured Vardoran map (v0.59.2),
+        // a good baseline for both the World Map and the player-position Heat Map (they share these bounds).
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustWorldMapMinX),               -2900f, "Faust map underlay calibration: the world X the LEFT edge of worldmap.png corresponds to.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustWorldMapMaxX),                180f,   "Faust map underlay calibration: the world X the RIGHT edge of worldmap.png corresponds to.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustWorldMapMinZ),               -2400f, "Faust map underlay calibration: the world Z the BOTTOM edge of worldmap.png corresponds to.");
+        InitConfigEntry(GENERAL_SETTINGS_GROUP, nameof(FaustWorldMapMaxZ),                650f,   "Faust map underlay calibration: the world Z the TOP edge of worldmap.png corresponds to.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowUrielObjectSpawnerOverlay), false, "Whether the Uriel object-spawn palette overlay (quick-build list of your unlocked objects with per-row Spawn buttons) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowBeelzTransformOverlay),   false, "Whether the Beelz Transforms overlay (double-click a form to transform; phase/revert controls) was visible at last logout.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShowChatWindowOverlay),       false, "Whether the standalone tabbed chat window (Game UI) was visible at last logout.");
@@ -1511,6 +1603,7 @@ public class Settings
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FamiliarOverlayTransparency), 0.4f,  "Familiar overlay background transparency.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FamiliarBrowserTransparency), 0.4f,  "Familiar Browser overlay background transparency.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FamiliarQuickSpawnOverlayTransparency), 0.4f, "Familiar Quick Spawn overlay background transparency (0.0=solid, 1.0=invisible).");
+        InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(FaustBossTrackerOverlayTransparency), 0.4f, "Faust boss-tracker overlay background transparency (0.0=solid, 1.0=invisible).");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(DailyQuestTransparency),      0.4f,  "Daily quest overlay background transparency.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ProfessionOverlayTransparency), 0.4f, "Profession overlay background transparency.");
         InitConfigEntry(OVERLAY_SETTINGS_GROUP, nameof(ShiftSpellOverlayTransparency), 0.4f, "Shift-spell cooldown overlay background transparency (0.0=solid, 1.0=invisible).");
