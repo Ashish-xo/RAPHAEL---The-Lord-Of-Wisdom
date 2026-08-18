@@ -1,0 +1,17 @@
+{
+  "name": "raphael-lord-of-wisdom",
+  "version": "1.0.0",
+  "description": "Raphael — Lord of Wisdom Voice Assistant. Ultimate Skill Desktop App.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": ["raphael", "tensura", "voice", "assistant", "electron"],
+  "author": "Master Rimuru",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {
+    "electron": "^31.0.0"
+  }
+}

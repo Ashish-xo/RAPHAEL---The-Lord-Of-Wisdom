@@ -45,6 +45,9 @@ dist/
 Resources/secrets.local.json
 *.local.json
 
+# ---- Node.js ----
+node_modules/
+
 # ---- OS noise ----
 Thumbs.db
 ehthumbs.db
